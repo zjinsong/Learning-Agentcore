@@ -46,14 +46,7 @@ MCP 是工具交互协议。你先列举工具，看到名字、用途和参数�
 
 “Identity”最容易被混成一件事。实际上先问方向就清楚了：是用户进入 Agent，还是 Agent 去访问别的系统？
 
-```mermaid
-flowchart LR
-    U[用户或调用应用] -->|入站| R[Runtime / Gateway]
-    R -->|出站| G[Gateway / Agent]
-    G --> X[外部工单、SaaS 或企业 API]
-    I[企业 IdP / AgentCore Identity] -.身份或凭证配置.-> R
-    I -.工作负载身份、OAuth token、API Key.-> G
-```
+![AgentCore Identity：入站认证与出站授权](../assets/identity-inbound-outbound.svg)
 
 | 方向 | 谁访问谁 | 谁负责登录与鉴权 | Identity 在哪里 |
 | --- | --- | --- | --- |

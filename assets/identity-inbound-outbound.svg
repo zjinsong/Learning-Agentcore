@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560" role="img" aria-labelledby="title desc">
+  <title id="title">AgentCore Identity：入站鉴权与出站授权</title>
+  <desc id="desc">调用方经入站鉴权访问 Runtime 或 Gateway；它们经出站授权访问 AWS 或外部资源。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4e9ff"/><stop offset="1" stop-color="#e7f5ff"/></linearGradient>
+    <linearGradient id="node" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#76c8f6"/><stop offset="1" stop-color="#a66df2"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#6d5f90" flood-opacity=".22"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#6f78ff"/></marker>
+  </defs>
+  <rect x="1" y="1" width="1398" height="558" rx="22" fill="white" stroke="#d5d7e2"/>
+  <text x="36" y="52" font-family="Arial,Microsoft YaHei,sans-serif" font-size="28" font-weight="700" fill="#172033">工作原理：入站认证与出站授权</text>
+  <rect x="26" y="75" width="1348" height="450" rx="25" fill="url(#bg)"/>
+  <g font-family="Arial,Microsoft YaHei,sans-serif" fill="#1d2330">
+    <g filter="url(#shadow)"><rect x="58" y="260" width="112" height="82" rx="14" fill="white"/><text x="114" y="293" text-anchor="middle" font-size="25">Caller</text><text x="114" y="320" text-anchor="middle" font-size="16" fill="#525866">用户 / 应用</text></g>
+    <path d="M170 301 H248" stroke="#6f78ff" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="208" y="230" width="155" height="142" rx="16" fill="#f8f9ff"/><text x="285" y="279" text-anchor="middle" font-size="19" font-weight="700">入站鉴权</text><text x="285" y="308" text-anchor="middle" font-size="15" fill="#525866">IAM / SigV4</text><text x="285" y="332" text-anchor="middle" font-size="15" fill="#525866">或企业 JWT</text></g>
+    <path d="M363 301 H415" stroke="#6f78ff" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="416" y="205" width="214" height="190" rx="16" fill="url(#node)"/><text x="523" y="274" text-anchor="middle" font-size="28" font-weight="700" fill="white">Hosted Agent</text><text x="523" y="307" text-anchor="middle" font-size="18" fill="white">Runtime</text><text x="523" y="336" text-anchor="middle" font-size="16" fill="#f7f5ff">你的 Agent 应用</text></g>
+    <path d="M630 301 H700" stroke="#6f78ff" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="700" y="230" width="166" height="142" rx="16" fill="#f8f9ff"/><text x="783" y="279" text-anchor="middle" font-size="19" font-weight="700">Agent 出站授权</text><text x="783" y="308" text-anchor="middle" font-size="15" fill="#525866">Agent 身份</text><text x="783" y="332" text-anchor="middle" font-size="15" fill="#525866">OAuth / API Key</text></g>
+    <path d="M866 273 H965" stroke="#6f78ff" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <path d="M866 331 C900 331 902 421 965 421" stroke="#6f78ff" fill="none" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="966" y="205" width="365" height="92" rx="15" fill="white"/><text x="1148" y="244" text-anchor="middle" font-size="22" font-weight="700">AWS resources / Agents</text><text x="1148" y="270" text-anchor="middle" font-size="16" fill="#525866">IAM 角色与 AWS 服务权限</text></g>
+    <g filter="url(#shadow)"><rect x="966" y="374" width="365" height="94" rx="15" fill="white"/><text x="1148" y="414" text-anchor="middle" font-size="22" font-weight="700">External resources / Agents</text><text x="1148" y="442" text-anchor="middle" font-size="16" fill="#525866">外部 API：OAuth、API Key</text></g>
+    <text x="678" y="198" text-anchor="middle" font-size="15" fill="#5961b8">Identity 管理出站凭证</text>
+    <text x="285" y="401" text-anchor="middle" font-size="14" fill="#59616c">登录页由企业应用或 IdP 提供</text>
+  </g>
+</svg>
