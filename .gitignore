@@ -1,0 +1,12 @@
+.local/
+.secrets/
+.env
+.env.*
+.venv/
+__pycache__/
+*.pyc
+*.pem
+*.ppk
+*.key
+*.zip
+*.log

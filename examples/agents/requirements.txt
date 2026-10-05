@@ -1,0 +1,5 @@
+bedrock-agentcore
+botocore
+requests
+fastapi
+uvicorn
