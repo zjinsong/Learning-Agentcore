@@ -53,27 +53,93 @@ sequenceDiagram
 
 ## 四、IAM 调用：botocore 自动签名
 
+下面直接调用上一节部署的第一个 Runtime `tutorial_hello`。程序已经在 AWS 中国区运行；你可以从本机，也可以从具有相应权限的 EC2 上向它发请求。
+
+### 1. 最快的方法：调用已部署的 Runtime
+
+在仓库根目录打开 PowerShell，使用上一节部署时的 AWS 身份：
+
+```powershell
+$env:AWS_PROFILE = "china-learning"
+$env:AWS_REGION = "cn-northwest-1"
+python examples/runtime/deploy.py status
+python examples/runtime/deploy.py invoke --prompt hello
+```
+
+第一条 Python 命令检查云端 Runtime 状态，应为 READY。第二条向云端发送 `{"prompt":"hello"}`，不是启动本地程序，也不会重新部署。
+
+预期返回：
+
+```json
+{"answer":"Received: hello","mode":"learning-example"}
+```
+
+调用脚本从 `.local/runtime.json` 读取上一节保存的 `runtime_arn` 和 `region`，无需手工填写账户或地址。`china-learning` 要替换为你自己的 profile；如果使用 EC2 实例角色，则不用设置这个 profile。
+
+### 2. 自己写一个完整的调用文件
+
+上一种方法已经能用。下面把同一过程展开，便于你在自己的应用中调用它。
+
+在仓库根目录创建 `invoke_first.py`，复制下面完整代码。与仅展示 API 片段不同，这里会先读取真实部署记录，再发请求：
+
 ```python
 import json
 import uuid
+from pathlib import Path
 import botocore.session
 from botocore.config import Config
+
+lab = json.loads(Path(".local/runtime.json").read_text(encoding="utf-8"))
+runtime_arn = lab["runtime_arn"]
+region = lab["region"]
 
 session = botocore.session.get_session()
 client = session.create_client(
     "bedrock-agentcore",
-    region_name="cn-northwest-1",
+    region_name=region,
     config=Config(connect_timeout=5, read_timeout=90, retries={"total_max_attempts": 1}),
 )
 response = client.invoke_agent_runtime(
     agentRuntimeArn=runtime_arn,
     qualifier="DEFAULT",
     runtimeSessionId=str(uuid.uuid4()),
+    contentType="application/json",
+    accept="application/json",
     payload=json.dumps({"prompt": "hello"}).encode("utf-8"),
 )
-text = response["response"].read().decode("utf-8")
-print(text)
+body = response["response"]
+try:
+    print(body.read().decode("utf-8"))
+finally:
+    body.close()
+    client.close()
 ```
+
+保存后，仍在仓库根目录执行：
+
+```powershell
+python -m pip install -U botocore
+python invoke_first.py
+```
+
+应该得到同一个 `Received: hello`。要换问题，修改 payload 中的 `hello`。目前这个入门程序只回显输入，接入模型后才会生成模型回答。
+
+### 3. 从 AWS 上的 EC2 调用
+
+云端调用不要求调用程序也部署在 Runtime。你可以在 EC2 上运行同一个 Python 文件。
+
+把 `invoke_first.py` 和自己的 `.local/runtime.json` 放在同一工作目录结构中，给 EC2 绑定有目标 Runtime 调用权限的实例角色。在 Linux 终端执行：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U botocore
+python invoke_first.py
+```
+
+botocore 会通过默认凭证链获取实例角色的临时凭证。不要把本机的长期 Access Key 写进代码。部署记录含资源标识，留在自己的环境，不提交到公开仓库。
+
+### 4. 调用权限与常见错误
 
 这是底层 SDK 调用，不是把 API Key 塞进请求头。botocore 从你当前 AWS 身份取凭证，完成 SigV4 签名。
 
@@ -94,6 +160,15 @@ caller_policy = {
 只列出本例 DEFAULT endpoint，避免授予调用所有应用的权限。[资源与动作参考](https://docs.aws.amazon.com/service-authorization/latest/reference/list_bedrock-agentcore.html)
 
 本例 `read_timeout=90` 是客户端读取等待期限，不是模型任务总期限，也不是 Runtime 固定上限。[Invoke API](https://docs.aws.amazon.com/botocore/latest/reference/services/bedrock-agentcore/client/invoke_agent_runtime.html)
+
+| 现象 | 怎么检查 |
+| --- | --- |
+| 找不到 .local/runtime.json | 回到仓库根目录；确认上一节创建步骤已完成 |
+| 文件中没有 runtime_arn | 目前可能只完成 prepare，尚未成功创建 Runtime |
+| 找不到 AWS 凭证 | 检查本机 profile 登录，或 EC2 实例角色 |
+| AccessDenied / 403 | 检查调用者对 Runtime 和 DEFAULT endpoint 的权限 |
+| ResourceNotFound | 检查记录的 ARN、区域，确认资源未删除 |
+| 超时或应用异常 | 检查云端 Runtime 日志；先调用最小 hello 排除模型和工具因素 |
 
 ## 五、四个参数分别是什么
 
