@@ -211,9 +211,88 @@ https://bedrock-agentcore.<区域>.amazonaws.com.cn/runtimes/<URL编码后的Run
 
 ## 八、练习：同一个应用，两个 session
 
-连续调用两次 hello，第一次保留 session ID，第二次复用。再使用新 session 比较。响应耗时可能不同，但不要仅凭一次快慢断言平台性能；模型、工具、网络和运行环境准备都会影响。
+下面调用上一节部署的 `tutorial_hello`。在仓库根目录打开 PowerShell，沿用前面配置好的 AWS 身份。
 
-本教程的调用命令默认生成新 session，也支持 `--session-id` 显式复用。业务隔离与历史保存仍要自己设计。
+### 1. 创建两个不同的 session ID
+
+```powershell
+$sessionA = [guid]::NewGuid().ToString()
+$sessionB = [guid]::NewGuid().ToString()
+Write-Output "Session A: $sessionA"
+Write-Output "Session B: $sessionB"
+```
+
+变量中保存的是两条不同的 UUID 字符串，各有 36 个字符，满足 session ID 的长度要求。它们是会话标识，不是登录 token。
+
+### 2. 用 session A 调用两次
+
+```powershell
+python examples/runtime/deploy.py invoke --session-id $sessionA --prompt "hello A, first request"
+python examples/runtime/deploy.py invoke --session-id $sessionA --prompt "hello A, second request"
+```
+
+两次预期分别返回：
+
+```json
+{"answer":"Received: hello A, first request","mode":"learning-example"}
+```
+
+```json
+{"answer":"Received: hello A, second request","mode":"learning-example"}
+```
+
+两个请求携带相同 session ID，在会话仍有效时使用同一个运行会话。这不表示应用会自动记住第一句话。本例只回显当前输入，没有实现聊天历史。
+
+### 3. 用 session B 调用一次
+
+```powershell
+python examples/runtime/deploy.py invoke --session-id $sessionB --prompt "hello B, first request"
+```
+
+预期返回：
+
+```json
+{"answer":"Received: hello B, first request","mode":"learning-example"}
+```
+
+这次使用另一个运行会话。因为同一份程序处理输入，返回格式相同；不能凭返回格式判断两个 session 是否相同，要检查请求中传入的 ID。
+
+```mermaid
+flowchart LR
+    A1[A 第一次请求] --> SA[运行会话 A]
+    A2[A 第二次请求] --> SA
+    B1[B 第一次请求] --> SB[运行会话 B]
+    SA --> APP[同一应用、同一入口代码]
+    SB --> APP
+```
+
+### 4. 可选：记录调用耗时
+
+下面分别测量 A 的后续请求和一个新会话的请求：
+
+```powershell
+$reuseSeconds = (Measure-Command {
+    python examples/runtime/deploy.py invoke --session-id $sessionA --prompt "timing reused session" | Out-Host
+}).TotalSeconds
+$sessionC = [guid]::NewGuid().ToString()
+$newSeconds = (Measure-Command {
+    python examples/runtime/deploy.py invoke --session-id $sessionC --prompt "timing new session" | Out-Host
+}).TotalSeconds
+Write-Output "Reused session: $reuseSeconds seconds"
+Write-Output "New session: $newSeconds seconds"
+```
+
+这里测的是从本机启动 Python 到收到完整答复的总耗时，包含 SDK 初始化、网络与服务处理，不是纯粹的 Runtime 冷启动时间。新会话和复用会话可能耗时不同，多次观察即可，不预设谁一定更快。
+
+### 5. 省略 session ID 会怎样
+
+```powershell
+python examples/runtime/deploy.py invoke --prompt hello
+```
+
+**本教程的脚本**每次省略 `--session-id` 时都会生成一个新 UUID；想复用，就像上面一样显式传入。这个行为来自脚本，不是说所有 SDK 调用都必须如此。
+
+实际聊天应用应为各用户的会话保存对应 ID，并独立设计聊天历史存储。不要给所有用户使用同一个固定 ID，也不要把会话复用当成永久记忆。
 
 ## 代码与下一步
 
