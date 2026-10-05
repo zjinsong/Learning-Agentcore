@@ -22,7 +22,7 @@ Amazon Bedrock AgentCore MCP Server 安装在你的开发环境，由编码助�
 
 按 [uv 安装文档](https://docs.astral.sh/uv/getting-started/installation/) 安装后，在终端检查：
 
-```powershell
+```bash
 uvx --version
 ```
 
@@ -60,7 +60,7 @@ uvx --version
 
 在终端执行：
 
-```powershell
+```bash
 claude mcp add --scope user --transport stdio --env AWS_REGION=cn-northwest-1 --env FASTMCP_LOG_LEVEL=ERROR bedrock-agentcore-mcp-server -- uvx awslabs.amazon-bedrock-agentcore-mcp-server@latest
 claude mcp list
 ```
@@ -73,7 +73,7 @@ claude mcp list
 
 通过 CLI 注册：
 
-```powershell
+```bash
 codex mcp add bedrock-agentcore-mcp-server --env AWS_REGION=cn-northwest-1 --env FASTMCP_LOG_LEVEL=ERROR -- uvx awslabs.amazon-bedrock-agentcore-mcp-server@latest
 codex mcp list
 ```

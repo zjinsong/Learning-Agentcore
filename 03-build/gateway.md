@@ -113,7 +113,7 @@ target = control.create_gateway_target(
 
 运行本节辅助程序：
 
-```powershell
+```bash
 python examples/gateway/deploy.py
 ```
 
@@ -133,7 +133,7 @@ permission = {
 
 将服务返回的 `gatewayUrl` 放入 Runtime 的环境变量 `GATEWAY_URL`，区域放入 `TOOL_REGION`。地址取服务返回值，不手工猜测域名。
 
-```powershell
+```bash
 python examples/runtime/deploy.py connect
 ```
 
@@ -164,7 +164,7 @@ IAM 请求还需要 SigV4 签名。参考客户端用 botocore 签完整的 HTTP
 
 ## 八、从 Runtime 完成一次真实调用
 
-```powershell
+```bash
 python examples/runtime/deploy.py invoke --prompt "check gateway"
 ```
 

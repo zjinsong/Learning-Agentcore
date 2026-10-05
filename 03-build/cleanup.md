@@ -4,61 +4,63 @@
 
 ## 一、删除 Gateway target，再删除 Gateway
 
-```powershell
-$lab = Get-Content .local/runtime.json -Raw | ConvertFrom-Json
-$gw = Get-Content .local/gateway.json -Raw | ConvertFrom-Json
-aws bedrock-agentcore-control delete-gateway-target --gateway-identifier $gw.gateway_id --target-id $gw.target_id --region $gw.region
+```bash
+runtime_region=$(jq -r .region .local/runtime.json)
+runtime_id=$(jq -r .runtime_id .local/runtime.json)
+gateway_id=$(jq -r .gateway_id .local/gateway.json)
+gateway_region=$(jq -r .region .local/gateway.json)
+status_target=$(jq -r .target_id .local/gateway.json)
+aws bedrock-agentcore-control delete-gateway-target --gateway-identifier "$gateway_id" --target-id "$status_target" --region "$gateway_region"
 ```
 
-若完成第四章，还要删除两个业务 target：
+若完成第四章，执行下面完整代码块。它读取第四章状态，再删除两个业务 target、Runtime、Lambda 与镜像：
 
-```powershell
-$agents = Get-Content .local/agents.json -Raw | ConvertFrom-Json
-aws bedrock-agentcore-control delete-gateway-target --gateway-identifier $gw.gateway_id --target-id $agents.monitoring.target_id --region $gw.region
-aws bedrock-agentcore-control delete-gateway-target --gateway-identifier $gw.gateway_id --target-id $agents.audit.target_id --region $gw.region
+```bash
+agent_region=$(jq -r .region .local/agents.json)
+monitoring_target=$(jq -r .monitoring.target_id .local/agents.json)
+audit_target=$(jq -r .audit.target_id .local/agents.json)
+monitoring_runtime=$(jq -r .monitoring.runtime_id .local/agents.json)
+audit_runtime=$(jq -r .audit.runtime_id .local/agents.json)
+aws bedrock-agentcore-control delete-gateway-target --gateway-identifier "$gateway_id" --target-id "$monitoring_target" --region "$gateway_region"
+aws bedrock-agentcore-control delete-gateway-target --gateway-identifier "$gateway_id" --target-id "$audit_target" --region "$gateway_region"
+aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id "$monitoring_runtime" --region "$agent_region"
+aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id "$audit_runtime" --region "$agent_region"
+aws lambda delete-function --function-name tutorial-monitoring-tool --region "$agent_region"
+aws lambda delete-function --function-name tutorial-audit-tool --region "$agent_region"
+aws ecr delete-repository --repository-name agentcore-tutorial-agents --force --region "$agent_region"
 ```
 
 若接入工单 API，读取 `.local/ticket-provider.json`，再删除其中 target_id 对应的 target。未创建的资源跳过。
 
 删除可能异步完成。等列表为空，再删 Gateway：
 
-```powershell
-aws bedrock-agentcore-control list-gateway-targets --gateway-identifier $gw.gateway_id --region $gw.region
-aws bedrock-agentcore-control delete-gateway --gateway-identifier $gw.gateway_id --region $gw.region
+```bash
+aws bedrock-agentcore-control list-gateway-targets --gateway-identifier "$gateway_id" --region "$gateway_region"
+aws bedrock-agentcore-control delete-gateway --gateway-identifier "$gateway_id" --region "$gateway_region"
 ```
 
 ## 二、删除 Runtime、Lambda 和镜像
 
 第三章资源：
 
-```powershell
-aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id $lab.runtime_id --region $lab.region
-aws lambda delete-function --function-name agentcore-tutorial-status --region $lab.region
+```bash
+aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id "$runtime_id" --region "$runtime_region"
+aws lambda delete-function --function-name agentcore-tutorial-status --region "$runtime_region"
 ```
 
-第四章资源（仅在创建过时执行）：
+确认第三章 Runtime 删除完成后，再删它的学习镜像仓库：
 
-```powershell
-aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id $agents.monitoring.runtime_id --region $agents.region
-aws bedrock-agentcore-control delete-agent-runtime --agent-runtime-id $agents.audit.runtime_id --region $agents.region
-aws lambda delete-function --function-name tutorial-monitoring-tool --region $agents.region
-aws lambda delete-function --function-name tutorial-audit-tool --region $agents.region
+```bash
+aws ecr delete-repository --repository-name agentcore-tutorial-runtime --force --region "$runtime_region"
 ```
 
-确认 Runtime 删除完成后，再删学习镜像仓库：
-
-```powershell
-aws ecr delete-repository --repository-name agentcore-tutorial-runtime --force --region $lab.region
-aws ecr delete-repository --repository-name agentcore-tutorial-agents --force --region $lab.region
-```
-
-只做第三章时删除第一个仓库。`--force` 会删除仓库中全部镜像，先保存需要的数据。
+第四章的 agents 仓库已在前面的可选代码块删除。`--force` 会删除仓库中全部镜像，先保存需要的数据。
 
 ## 三、删除 IAM 角色
 
 角色不能带着策略直接删除。先查看策略，再逐项删除。例如：
 
-```powershell
+```bash
 aws iam list-role-policies --role-name tutorial-runtime-role
 aws iam delete-role-policy --role-name tutorial-runtime-role --policy-name tutorial-runtime-base
 aws iam delete-role-policy --role-name tutorial-runtime-role --policy-name learning-invoke-gateway
@@ -82,15 +84,15 @@ aws iam delete-role --role-name tutorial-runtime-role
 
 Lambda 日志组分别为 `/aws/lambda/agentcore-tutorial-status`、`/aws/lambda/tutorial-monitoring-tool`、`/aws/lambda/tutorial-audit-tool`。Runtime 日志组按实际 Runtime ID 命名，检查 ID 后删除：
 
-```powershell
-aws logs describe-log-groups --log-group-name-prefix /aws/bedrock-agentcore/runtimes/tutorial_ --region $lab.region
-aws logs delete-log-group --log-group-name /aws/lambda/agentcore-tutorial-status --region $lab.region
+```bash
+aws logs describe-log-groups --log-group-name-prefix /aws/bedrock-agentcore/runtimes/tutorial_ --region "$runtime_region"
+aws logs delete-log-group --log-group-name /aws/lambda/agentcore-tutorial-status --region "$runtime_region"
 ```
 
 可选 Identity Provider：
 
-```powershell
-aws bedrock-agentcore-control delete-api-key-credential-provider --name tutorial-ticket-key --region $lab.region
+```bash
+aws bedrock-agentcore-control delete-api-key-credential-provider --name tutorial-ticket-key --region "$runtime_region"
 ```
 
 再核对对应 Secret 是否按服务行为清理。只清理本实验专用 Secret，优先采用可恢复的计划删除。外部系统签发的 Key 需在那个系统撤销；删除 AWS 配置不等于撤销外部权限。

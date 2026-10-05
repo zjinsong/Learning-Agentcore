@@ -38,27 +38,41 @@ control = session.create_client("bedrock-agentcore-control", region_name="cn-nor
 
 ## 三、准备环境
 
-以下命令从仓库根目录执行，使用 Windows PowerShell。Python 代码可以跨平台；Linux 用户只需调整环境变量和终端命令写法。
+以下命令使用 Linux 的 Bash，从仓库根目录执行。可以在本机 Linux、WSL 或自己的 EC2 上操作。
 
-需要 Python 3.12、Docker 的 Linux 容器环境、ARM64 构建能力，以及已经配置的 AWS 中国区身份。
+需要 Python 3.12、Docker、AWS CLI、jq、ARM64 构建能力，以及已经配置的 AWS 中国区身份。jq 用来读取部署记录中的字段。
 
-```powershell
+首次取得教程并建立 Python 虚拟环境：
+
+```bash
+git clone https://github.com/zjinsong/Learning-Agentcore.git
+cd Learning-Agentcore
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+已有仓库时进入它的根目录即可。Ubuntu 缺少虚拟环境或 jq 时，可以先安装 `python3-venv`、`jq` 系统包。后文的 `python` 指已激活虚拟环境中的 Python。
+
+```bash
 python --version
 docker version
 aws --version
+jq --version
 python -m pip install -U botocore bedrock-agentcore requests
 ```
 
 设置本地 profile 别名和区域：
 
-```powershell
-$env:AWS_PROFILE = "china-learning"
-$env:AWS_REGION = "cn-northwest-1"
-$env:AWS_DEFAULT_REGION = "cn-northwest-1"
+```bash
+export AWS_PROFILE=china-learning
+export AWS_REGION=cn-northwest-1
+export AWS_DEFAULT_REGION=cn-northwest-1
 aws sts get-caller-identity --region cn-northwest-1
 ```
 
 `china-learning` 是你的本地配置名，不是仓库提供的账号。尚未配置时，先完成企业已有的登录流程，或按 [CLI 凭证配置](https://docs.amazonaws.cn/en_us/cli/latest/userguide/cli-chap-configure.html) 建立自己的身份。上面的输出含账户信息，只在本地查看。
+
+若在 EC2 上使用实例角色，跳过 `export AWS_PROFILE=china-learning`，保持区域设置即可。不要把不存在的 profile 覆盖到已经可用的实例角色身份上。
 
 北京区域使用 `cn-north-1`；整个实验保持一致。创建资源需要部署身份具备对应服务权限，运行程序则使用下面的执行角色。
 

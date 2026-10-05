@@ -82,20 +82,21 @@ audit___cloud_query
 
 第三章脚本只创建固定名称的入门 Runtime。这里使用本章的分步辅助脚本：
 
-```powershell
+```bash
 python examples/agents/build.py lambda
 python examples/agents/build.py roles
 ```
 
 第一步部署两种 Lambda、挂载 target。第二步创建两种 Runtime 角色和镜像仓库，把待部署信息保存在 `.local/agents.json`。之后构建镜像：
 
-```powershell
-$agents = Get-Content .local/agents.json -Raw | ConvertFrom-Json
-$registry = $agents.repository_uri.Split('/')[0]
-aws ecr get-login-password --region $agents.region | docker login --username AWS --password-stdin $registry
+```bash
+agent_image_uri=$(jq -r .repository_uri .local/agents.json)
+agent_region=$(jq -r .region .local/agents.json)
+registry=${agent_image_uri%%/*}
+aws ecr get-login-password --region "$agent_region" | docker login --username AWS --password-stdin $registry
 docker buildx build --platform linux/arm64 --provenance=false --load -t tutorial-agents:v1 examples/agents
-docker tag tutorial-agents:v1 "$($agents.repository_uri):v1"
-docker push "$($agents.repository_uri):v1"
+docker tag tutorial-agents:v1 "${agent_image_uri}:v1"
+docker push "${agent_image_uri}:v1"
 python examples/agents/build.py runtimes
 ```
 
@@ -111,14 +112,14 @@ python examples/agents/build.py runtimes
 
 从终端发出这两个真实调用：
 
-```powershell
+```bash
 python examples/agents/invoke.py --expert monitoring --task discover
 python examples/agents/invoke.py --expert audit --task audit
 ```
 
 查询指标需要真实发现的 ID。将下面占位文字替换为发现结果中的一台实例 ID：
 
-```powershell
+```bash
 python examples/agents/invoke.py --expert monitoring --task metrics --instance-id "替换为真实实例ID"
 ```
 
@@ -134,7 +135,7 @@ python examples/agents/invoke.py --expert monitoring --task metrics --instance-i
 
 准备好可访问的模型接口后，执行下面可选步骤：
 
-```powershell
+```bash
 python examples/agents/configure_model.py
 ```
 
@@ -148,7 +149,7 @@ python examples/agents/configure_model.py
 
 对应调用命令：
 
-```powershell
+```bash
 python examples/agents/invoke.py --expert audit --question "查询今天发起的关机操作"
 ```
 

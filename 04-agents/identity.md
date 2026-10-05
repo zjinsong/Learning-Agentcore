@@ -1,8 +1,10 @@
-# 4.1 用 Identity 管理外部工单 API Key
+# 4.1 出站：用 Identity 管理外部工单 API Key
 
 设想你有一个工单 API。它允许查询工单，但要求请求头中携带 `X-API-Key`。
 
-Key 由工单系统签发，不由 AgentCore 生成。Identity 保存这个凭证，Gateway 在调用工具时使用它。
+Key 由工单系统签发，不由 AgentCore 生成。Identity 保存这个**出站**凭证，Gateway 在调用工具时使用它。它不用于用户登录，也不能让客户端直接拿 API Key 调用 Runtime。
+
+如果你正在找的是“用户怎样登录并调用 Runtime / Gateway”，先读第一章的[入站与出站](../01-china/README.md#四identity先分清入站和出站)：企业 IdP 负责登录，JWT 或 IAM/SigV4 负责入站鉴权；本页只讲 Agent 访问外部系统。
 
 ## 一、先确认真的需要它
 
@@ -115,7 +117,7 @@ Gateway service role 必须有权获取对应凭证，以及按配置读取相�
 
 把前面的 OpenAPI 内容保存为 `.local/tickets.yaml`，替换为你自己的 API 地址；然后执行：
 
-```powershell
+```bash
 python examples/agents/identity_setup.py
 ```
 

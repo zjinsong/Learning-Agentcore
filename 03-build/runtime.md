@@ -18,10 +18,10 @@ def handler(event, context):
     return {"answer": "Received: " + prompt}
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=8080)
 ```
 
-`event` 是本次请求的内容。`handler` 是入口函数。`@app.entrypoint` 把它注册到应用，`app.run()` 启动服务。
+`event` 是本次请求的内容。`handler` 是入口函数。`@app.entrypoint` 把它注册到应用，`app.run(...)` 启动服务，明确监听 `0.0.0.0:8080`。这表示接受运行环境传来的请求；如果只监听 `127.0.0.1`，服务可能无法连接到入口。
 
 使用 HTTP 模式时，容器监听 `0.0.0.0:8080`，接收 `/invocations` 请求，提供 `/ping` 健康检查。部署镜像需要 ARM64。[HTTP 契约](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/runtime-http-protocol-contract.html)
 
@@ -29,16 +29,16 @@ if __name__ == "__main__":
 
 仓库已附上应用文件，从根目录启动：
 
-```powershell
+```bash
 python -m pip install -r examples/runtime/requirements.txt
 python examples/runtime/app.py
 ```
 
 保持窗口打开，在另一个终端请求：
 
-```powershell
-Invoke-RestMethod -Uri http://127.0.0.1:8080/ping
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8080/invocations -ContentType application/json -Body '{"prompt":"hello"}'
+```bash
+curl --fail --silent --show-error http://127.0.0.1:8080/ping
+curl --fail --silent --show-error http://127.0.0.1:8080/invocations -H 'Content-Type: application/json' -d '{"prompt":"hello"}'
 ```
 
 应该得到健康检查成功，以及含 `Received: hello` 的结果。本地入口能运行，再部署云端。
@@ -96,7 +96,7 @@ runtime_role_arn = runtime_role["Arn"]
 
 运行对应的准备步骤：
 
-```powershell
+```bash
 python examples/runtime/deploy.py prepare --region cn-northwest-1
 ```
 
@@ -120,22 +120,33 @@ CMD ["python", "app.py"]
 
 读取准备结果，登录 ECR：
 
-```powershell
-$lab = Get-Content .local/runtime.json -Raw | ConvertFrom-Json
-$registry = $lab.repository_uri.Split('/')[0]
-aws ecr get-login-password --region $lab.region | docker login --username AWS --password-stdin $registry
+```bash
+image_uri=$(jq -r .repository_uri .local/runtime.json)
+runtime_region=$(jq -r .region .local/runtime.json)
+registry=${image_uri%%/*}
+aws ecr get-login-password --region "$runtime_region" | docker login --username AWS --password-stdin $registry
 ```
 
 构建、检查架构、推送：
 
-```powershell
+先执行下面命令，确认输出的 `Platforms` 中包含 `linux/arm64`：
+
+```bash
+docker buildx inspect --bootstrap
+```
+
+x86 主机需要已有 ARM64 模拟或远程构建节点；只写 `--platform` 不会自动补齐缺少的构建能力。
+
+```bash
 docker buildx build --platform linux/arm64 --provenance=false --load -t agentcore-tutorial-runtime:v1 examples/runtime
 docker image inspect agentcore-tutorial-runtime:v1 --format '{{.Architecture}}'
-docker tag agentcore-tutorial-runtime:v1 "$($lab.repository_uri):v1"
-docker push "$($lab.repository_uri):v1"
+docker tag agentcore-tutorial-runtime:v1 "${image_uri}:v1"
+docker push "${image_uri}:v1"
 ```
 
 检查结果应为 `arm64`，推送完成会显示 digest。到这里，镜像已经上传，但应用还没运行。
+
+若推送因网络超时中断，恢复网络后重试 `docker push` 即可；已上传的层通常可以复用，不需要重建 ECR 仓库或 IAM 角色。
 
 ## 五、创建 Runtime
 
@@ -155,7 +166,7 @@ result = control.create_agent_runtime(
 
 执行创建步骤：
 
-```powershell
+```bash
 python examples/runtime/deploy.py create
 python examples/runtime/deploy.py status
 ```
@@ -166,7 +177,7 @@ python examples/runtime/deploy.py status
 
 READY 表示资源准备就绪。接下来必须发一个真实请求：
 
-```powershell
+```bash
 python examples/runtime/deploy.py invoke --prompt hello
 ```
 

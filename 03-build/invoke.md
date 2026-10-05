@@ -57,11 +57,11 @@ sequenceDiagram
 
 ### 1. 最快的方法：调用已部署的 Runtime
 
-在仓库根目录打开 PowerShell，使用上一节部署时的 AWS 身份：
+在仓库根目录打开 Linux 终端，使用上一节部署时的 AWS 身份：
 
-```powershell
-$env:AWS_PROFILE = "china-learning"
-$env:AWS_REGION = "cn-northwest-1"
+```bash
+export AWS_PROFILE=china-learning
+export AWS_REGION=cn-northwest-1
 python examples/runtime/deploy.py status
 python examples/runtime/deploy.py invoke --prompt hello
 ```
@@ -117,7 +117,7 @@ finally:
 
 保存后，仍在仓库根目录执行：
 
-```powershell
+```bash
 python -m pip install -U botocore
 python invoke_first.py
 ```
@@ -131,13 +131,16 @@ python invoke_first.py
 把 `invoke_first.py` 和自己的 `.local/runtime.json` 放在同一工作目录结构中，给 EC2 绑定有目标 Runtime 调用权限的实例角色。在 Linux 终端执行：
 
 ```bash
+unset AWS_PROFILE
+export AWS_REGION=cn-northwest-1
+export AWS_DEFAULT_REGION=cn-northwest-1
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U botocore
 python invoke_first.py
 ```
 
-botocore 会通过默认凭证链获取实例角色的临时凭证。不要把本机的长期 Access Key 写进代码。部署记录含资源标识，留在自己的环境，不提交到公开仓库。
+`unset AWS_PROFILE` 很重要：不要让前面为本机准备的 profile 覆盖 EC2 的实例角色。botocore 会通过默认凭证链获取实例角色的临时凭证。不要把本机的长期 Access Key 写进代码。部署记录含资源标识，留在自己的环境，不提交到公开仓库。
 
 ### 4. 调用权限与常见错误
 
@@ -191,6 +194,8 @@ session ID 至少 33 个字符，普通 UUID 字符串有 36 个字符。给不�
 
 服务校验签名、有效期及你配置的 audience/client/scope/claims。企业 IdP 负责登录与签发令牌，Runtime 负责校验调用凭证。
 
+这属于**入站**认证：用户或调用应用进入 Runtime。它和 Gateway 使用 Identity 取得工单 OAuth token/API Key 的**出站**授权是两条不同方向的链路。第一章有完整的方向图和选择表：[Identity：入站与出站](../01-china/README.md#四identity先分清入站和出站)。
+
 中国区不要直接复制 Cognito user pool 快速创建示例。IAM 与 JWT 是不同入站配置，不是给同一请求同时放两种凭证即可。[Runtime 入站说明](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/runtime-oauth.html)
 
 JWT 的请求仍进入 AgentCore 对外接口，然后才转到容器内部入口。HTTP 地址结构示意为：
@@ -211,24 +216,24 @@ https://bedrock-agentcore.<区域>.amazonaws.com.cn/runtimes/<URL编码后的Run
 
 ## 八、练习：同一个应用，两个 session
 
-下面调用上一节部署的 `tutorial_hello`。在仓库根目录打开 PowerShell，沿用前面配置好的 AWS 身份。
+下面调用上一节部署的 `tutorial_hello`。在仓库根目录打开 Linux 终端，沿用前面配置好的 AWS 身份。
 
 ### 1. 创建两个不同的 session ID
 
-```powershell
-$sessionA = [guid]::NewGuid().ToString()
-$sessionB = [guid]::NewGuid().ToString()
-Write-Output "Session A: $sessionA"
-Write-Output "Session B: $sessionB"
+```bash
+sessionA=$(python -c 'import uuid; print(uuid.uuid4())')
+sessionB=$(python -c 'import uuid; print(uuid.uuid4())')
+echo "Session A: $sessionA"
+echo "Session B: $sessionB"
 ```
 
 变量中保存的是两条不同的 UUID 字符串，各有 36 个字符，满足 session ID 的长度要求。它们是会话标识，不是登录 token。
 
 ### 2. 用 session A 调用两次
 
-```powershell
-python examples/runtime/deploy.py invoke --session-id $sessionA --prompt "hello A, first request"
-python examples/runtime/deploy.py invoke --session-id $sessionA --prompt "hello A, second request"
+```bash
+python examples/runtime/deploy.py invoke --session-id "$sessionA" --prompt "hello A, first request"
+python examples/runtime/deploy.py invoke --session-id "$sessionA" --prompt "hello A, second request"
 ```
 
 两次预期分别返回：
@@ -245,8 +250,8 @@ python examples/runtime/deploy.py invoke --session-id $sessionA --prompt "hello 
 
 ### 3. 用 session B 调用一次
 
-```powershell
-python examples/runtime/deploy.py invoke --session-id $sessionB --prompt "hello B, first request"
+```bash
+python examples/runtime/deploy.py invoke --session-id "$sessionB" --prompt "hello B, first request"
 ```
 
 预期返回：
@@ -270,23 +275,19 @@ flowchart LR
 
 下面分别测量 A 的后续请求和一个新会话的请求：
 
-```powershell
-$reuseSeconds = (Measure-Command {
-    python examples/runtime/deploy.py invoke --session-id $sessionA --prompt "timing reused session" | Out-Host
-}).TotalSeconds
-$sessionC = [guid]::NewGuid().ToString()
-$newSeconds = (Measure-Command {
-    python examples/runtime/deploy.py invoke --session-id $sessionC --prompt "timing new session" | Out-Host
-}).TotalSeconds
-Write-Output "Reused session: $reuseSeconds seconds"
-Write-Output "New session: $newSeconds seconds"
+```bash
+echo "复用 session A："
+time python examples/runtime/deploy.py invoke --session-id "$sessionA" --prompt "timing reused session"
+sessionC=$(python -c 'import uuid; print(uuid.uuid4())')
+echo "使用新 session C："
+time python examples/runtime/deploy.py invoke --session-id "$sessionC" --prompt "timing new session"
 ```
 
-这里测的是从本机启动 Python 到收到完整答复的总耗时，包含 SDK 初始化、网络与服务处理，不是纯粹的 Runtime 冷启动时间。新会话和复用会话可能耗时不同，多次观察即可，不预设谁一定更快。
+`time` 输出中的 `real` 是总耗时；`user` 和 `sys` 是本地 CPU 时间。这里测的是从调用机器启动 Python 到收到完整答复的总耗时，包含 SDK 初始化、网络与服务处理，不是纯粹的 Runtime 冷启动时间。新会话和复用会话可能耗时不同，多次观察即可，不预设谁一定更快。
 
 ### 5. 省略 session ID 会怎样
 
-```powershell
+```bash
 python examples/runtime/deploy.py invoke --prompt hello
 ```
 

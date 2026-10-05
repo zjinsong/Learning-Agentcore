@@ -42,20 +42,46 @@ MCP 是工具交互协议。你先列举工具，看到名字、用途和参数�
 
 中国区没有 Gateway 语义工具搜索，但正常列举和调用工具不受影响。开始时使用明确的工具清单就可以。
 
-## 四、Identity：访问外部系统时，凭证放在哪里
+## 四、Identity：先分清入站和出站
 
-假设助手还要读取企业工单。工单 API 要求一个 API Key。
+“Identity”最容易被混成一件事。实际上先问方向就清楚了：是用户进入 Agent，还是 Agent 去访问别的系统？
 
-你可以自行管理它，也可以让 Identity 保存凭证，由获准的应用或 Gateway 获取并使用。Identity 还支持 OAuth 相关凭证管理和 Agent 工作负载身份。
+```mermaid
+flowchart LR
+    U[用户或调用应用] -->|入站| R[Runtime / Gateway]
+    R -->|出站| G[Gateway / Agent]
+    G --> X[外部工单、SaaS 或企业 API]
+    I[企业 IdP / AgentCore Identity] -.身份或凭证配置.-> R
+    I -.工作负载身份、OAuth token、API Key.-> G
+```
 
-已有企业 SSO 不一定需要替换。SSO 常解决用户登录；外部系统的凭证管理是另一件事。如果你的现有方案已经覆盖两者，就按需要决定是否使用 Identity。[Identity 概览](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/identity.html)
+| 方向 | 谁访问谁 | 谁负责登录与鉴权 | Identity 在哪里 |
+| --- | --- | --- | --- |
+| 入站 | 用户或你的应用 → Runtime / Gateway | 企业 IdP 登录后签发 JWT；Runtime/Gateway 校验 JWT。使用 AWS 调用时，由 IAM/SigV4 校验 | 可参与 IdP / JWT 身份集成；不提供登录网页 |
+| 出站 | Agent / Gateway → 外部系统 | 外部系统校验它自己的 IAM、OAuth token 或 API Key | 管理 Agent 工作负载身份，以及 OAuth token、API Key 等凭证 |
 
-| 方向 | 谁访问谁 | 这里如何处理 |
+### 入站：谁可以调用 Runtime 或 Gateway
+
+用户先在企业已有的 IdP 登录。IdP 的登录页、MFA 和会话管理仍由企业应用或 IdP 负责。前端取得 JWT 后，带着它调用 AgentCore；Runtime 或 Gateway 按你配置的 issuer、audience、client、scope 或 claims 进行校验。
+
+另一条入站路径是 AWS IAM：调用应用使用 IAM 用户、角色或 EC2/Lambda/ECS 的临时凭证，SDK 以 SigV4 签名请求。此时不需要用户 JWT，也不需要 API Key Provider。
+
+| 入口 | 适合什么 | 调用方带什么 |
 | --- | --- | --- |
-| 入站 | 你的应用访问 Runtime / Gateway | IAM 签名，或按配置校验 JWT |
-| 出站 | Agent / Gateway 访问外部 API | IAM、OAuth token、API Key，按目标要求选择 |
+| Runtime + IAM | 服务到服务、内部运维脚本、AWS 工作负载 | SigV4 签名请求 |
+| Runtime + JWT | Web / 移动端经企业登录后的用户调用 | `Authorization: Bearer <JWT>` |
+| Gateway + AWS_IAM | 本教程的 Agent 调工具 | SigV4 签名请求 |
+| Gateway + CUSTOM_JWT | 希望按企业登录用户限制工具调用 | 符合 Gateway 配置的 JWT |
 
-Identity 的 API Key Provider 是管理外部服务凭证的配置，不是让客户拿 API Key 直接调用 Runtime 的入站开关。中国区 Gateway 入站使用 AWS_IAM 或 CUSTOM_JWT；Runtime 支持 IAM/SigV4 或 JWT。[Runtime 鉴权](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/runtime-oauth.html)
+中国区 Gateway 只有 `AWS_IAM` 和 `CUSTOM_JWT` 两种入站方式，没有无鉴权入口；使用 `CUSTOM_JWT` 时，企业 OIDC IdP 是实际签发 JWT 的一方。中国区不支持 Cognito user pool 的快捷配置。[中国区差异](https://docs.amazonaws.cn/en_us/aws/latest/userguide/bedrock-agentcore.html)、[Runtime 入站鉴权](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/runtime-oauth.html)
+
+### 出站：Agent 怎样访问外部系统
+
+假设 Agent 要读取企业工单。工单 API 要求 API Key，或需要 OAuth token。Identity 可以保存和按需取用这类凭证，Gateway 带着凭证向工单 API 发请求。工单系统最终决定这个凭证能读取哪些工单。
+
+已有企业 SSO 不必替换：它继续负责用户登录；Identity 解决的是 Agent 运行时怎样安全持有和使用外部系统凭证。若现有凭证管理已经满足要求，也不必为了使用 AgentCore 再复制一份。
+
+**Identity 的 API Key Provider 不是入站 API Key。** 它不让客户拿 Key 直接调用 Runtime 或 Gateway；它是 Agent 出站调用外部服务时使用的 Key 存放与引用配置。完整 API Key 例子在第四章的 [外部工单服务](../04-agents/identity.md)。[Identity 概览](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/identity.html)
 
 ## 五、另外三个组件
 

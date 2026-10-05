@@ -74,7 +74,7 @@ Harness 到达截止时间后停止等待并标记超时；已经发出的云端
 
 从仓库根目录执行，无需云账号或模型：
 
-```powershell
+```bash
 python examples/harness/run.py
 python examples/harness/run.py --fail audit
 python examples/harness/run.py --fail discover
@@ -88,7 +88,7 @@ python examples/harness/run.py --fail discover
 
 完成第四章两个 Runtime 的部署后：
 
-```powershell
+```bash
 python examples/harness/run.py --live
 ```
 

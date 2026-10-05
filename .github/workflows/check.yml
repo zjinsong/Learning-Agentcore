@@ -10,4 +10,5 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r examples/runtime/requirements.txt
       - run: python scripts/check.py
+      - run: python scripts/check_shell.py
       - run: python scripts/verify_examples.py
