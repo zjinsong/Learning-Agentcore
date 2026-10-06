@@ -94,7 +94,7 @@ AWS 凭证不能写进容器。程序通过执行角色获得必要的访问权�
 1. [构建 Runtime](runtime.md)：入口代码、本地运行、镜像、角色、创建与状态。
 2. [怎样调用 Runtime](invoke.md)：服务契约、外部调用接口、认证、endpoint、session、流式返回。
 3. [构建 Gateway](gateway.md)：把 Lambda 注册成工具，并从 Runtime 调用。
-4. [实验结束后清理](cleanup.md)：按依赖顺序删除学习资源。
+4. 完成后继续第四章；全部教程结束后在 [第八章 Cleanup](../08-cleanup/README.md) 统一删除学习资源。
 
 完整代码集中在各节末尾。示例资源名都有 `tutorial` 标记，真实标识保存在被 Git 忽略的 `.local/`，不依赖任何已有 CloudOps 环境。
 
