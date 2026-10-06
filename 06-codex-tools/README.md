@@ -1,378 +1,177 @@
 # 第六章：Code Interpreter + Browser - Codex 实践
 
-这一章只做一件事：**让 Codex CLI 把 AgentCore Code Interpreter 和 Browser 当成可持续使用的工具。**
+这一章把 AgentCore Code Interpreter 和 Browser 暴露成一个本地 MCP server，让 Codex CLI 直接把它们当工具使用。
 
-适合这样的任务：
+完整代码已经放在本章目录：
 
-- Codex 负责理解需求、写代码和决定下一步。
-- Code Interpreter 负责在隔离环境里执行 Python、JavaScript 或 Shell。
-- Browser 负责打开网页、点击、输入、提取页面内容和截图。
+~~~text
+06-codex-tools/
+└── example/
+    ├── mcp_server.py
+    ├── requirements.txt
+    └── AGENTS.md
+~~~
 
-这三个组件分工不同，不要把它们混成一个运行环境。
+mcp_server.py 可以直接运行，不需要把示例代码从文章里重新拼起来。
 
-```mermaid
+## 一、整体关系
+
+~~~mermaid
 flowchart LR
     U[用户] --> C[Codex CLI]
-    C --> M[MCP 适配器]
-    M --> S[AgentCore Code Interpreter]
+    C --> M[本地 MCP server]
+    M --> I[AgentCore Code Interpreter]
     M --> B[AgentCore Browser]
-    S --> O[文件 / 计算结果]
-    B --> W[网页 / 截图 / 提取结果]
-    O --> C
-    W --> C
-```
+~~~
 
-## 一、为什么要这样组合
+Codex 负责理解任务和决定调用哪个工具。Code Interpreter 提供隔离代码执行环境，Browser 提供托管浏览器会话。
 
-Codex CLI 本身适合做长期编码任务，但有两类工作单独放在本机并不理想：
+## 二、安装
 
-1. 临时执行依赖不确定的代码，例如安装 Python 包、跑一次数据分析。
-2. 访问网页并完成浏览器交互，例如搜索资料、翻页、抓取页面内容。
+在仓库根目录执行：
 
-Code Interpreter 和 Browser 正好分别解决这两件事。
+~~~bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r 06-codex-tools/example/requirements.txt
+playwright install chromium
+~~~
 
-Codex 不需要“搬进” Code Interpreter 或 Browser。更简单的方式是：**让 Codex 通过 MCP 调用一个本地适配器，由适配器再调用 AgentCore 服务。**
+配置 AWS 中国区身份和区域：
 
-## 二、准备条件
+~~~bash
+export AWS_REGION=cn-northwest-1
+aws sts get-caller-identity --region cn-northwest-1
+~~~
 
-先准备：
+示例默认使用 AgentCore 内置标识：
 
-- 已安装 Codex CLI。
-- 已配置 AWS 中国区凭证。
-- 已有一个 AgentCore Code Interpreter。
-- 已有一个 AgentCore Browser。
-- Python 3.11+。
-- MCP Python SDK 和 boto3。
+~~~text
+aws.codeinterpreter.v1
+aws.browser.v1
+~~~
 
-示例默认区域：
+如需指定 Code Interpreter 标识，可以设置 AGENTCORE_CODE_INTERPRETER_ID。
 
-```text
-cn-northwest-1
-```
+## 三、先直接运行 MCP server
 
-资源 ID 不写死在代码里，建议放在本地配置文件或环境变量，例如：
+~~~bash
+python 06-codex-tools/example/mcp_server.py
+~~~
 
-```json
-{
-  "region": "cn-northwest-1",
-  "code_interpreter_id": "your-code-interpreter-id",
-  "browser_id": "your-browser-id"
-}
-```
+这是 stdio MCP server，启动后等待 MCP 客户端连接，因此终端没有普通 Web 服务的监听提示是正常的。
 
-这些配置只保留在本机，不提交到 Git 仓库。
+代码第一次收到 sandbox 工具调用时才创建 Code Interpreter session；第一次收到 browser 工具调用时才创建 Browser session。后续调用复用同一个 session。
 
-## 三、先做一个持续 Code Interpreter 会话
+进程退出时会尝试停止两个 session。
 
-Code Interpreter 最重要的是**复用同一个 session**。这样安装的包、Python 变量和临时文件可以在连续调用之间保留。
+## 四、接入 Codex CLI
 
-最小逻辑：
+Codex CLI 和 IDE 扩展共用 MCP 配置。可以在 ~/.codex/config.toml 中加入：
 
-```python
-import boto3
+~~~toml
+[mcp_servers.agentcore_tools]
+command = "python"
+args = ["/absolute/path/Learning-Agentcore/06-codex-tools/example/mcp_server.py"]
 
-region = "cn-northwest-1"
-client = boto3.client("bedrock-agentcore", region_name=region)
+[mcp_servers.agentcore_tools.env]
+AWS_REGION = "cn-northwest-1"
+~~~
 
-code_interpreter_id = "your-code-interpreter-id"
-session_id = None
+把路径换成你的仓库绝对路径，然后检查：
 
-def ensure_session():
-    global session_id
-    if session_id:
-        return session_id
+~~~bash
+codex mcp list
+~~~
 
-    response = client.start_code_interpreter_session(
-        codeInterpreterIdentifier=code_interpreter_id,
-        name="codex-workspace",
-        sessionTimeoutSeconds=28800,
-    )
-    session_id = response["sessionId"]
-    return session_id
-```
+Codex 应能看到 agentcore_tools MCP server。
 
-执行 Python：
+Codex MCP 配置参考：[OpenAI MCP 文档](https://developers.openai.com/learn/docs-mcp)。
 
-```python
-def run_python(code: str):
-    sid = ensure_session()
-    response = client.invoke_code_interpreter(
-        codeInterpreterIdentifier=code_interpreter_id,
-        sessionId=sid,
-        name="executeCode",
-        arguments={
-            "code": code,
-            "language": "python",
-            "clearContext": False,
-        },
-    )
+## 五、Code Interpreter 部分做了什么
 
-    output = []
-    for event in response["stream"]:
-        result = event.get("result")
-        if not result:
-            continue
-        for item in result.get("content", []):
-            if item.get("type") == "text":
-                output.append(item.get("text", ""))
+mcp_server.py 暴露两个工具：
 
-    return "\n".join(output)
-```
-
-连续两次调用：
-
-```python
-print(run_python("number = 41\nprint(number)"))
-print(run_python("print(number + 1)"))
-```
-
-第二次还能读取第一次创建的变量，说明 session 在复用。
-
-Shell 也可以用同一个 session：
-
-```python
-def run_shell(command: str):
-    sid = ensure_session()
-    response = client.invoke_code_interpreter(
-        codeInterpreterIdentifier=code_interpreter_id,
-        sessionId=sid,
-        name="executeCommand",
-        arguments={"command": command},
-    )
-
-    output = []
-    for event in response["stream"]:
-        result = event.get("result")
-        if not result:
-            continue
-        for item in result.get("content", []):
-            if item.get("type") == "text":
-                output.append(item.get("text", ""))
-
-    return "\n".join(output)
-```
-
-例如：
-
-```text
-pip install pandas
-```
-
-然后再执行 Python 使用 pandas。
-
-## 四、把 Code Interpreter 包成 Codex MCP 工具
-
-Codex CLI 可以注册 stdio MCP server。最小适配器结构：
-
-```python
-from mcp.server.fastmcp import FastMCP
-
-server = FastMCP("agentcore-sandbox")
-
-@server.tool()
-def sandbox_run(code: str, language: str = "python") -> str:
-    """在持续 AgentCore Code Interpreter session 中执行代码。"""
-    if language == "python":
-        return run_python(code)
-    raise ValueError("示例只实现 Python")
-
-@server.tool()
-def sandbox_command(command: str) -> str:
-    """在持续 session 中执行 Shell 命令。"""
-    return run_shell(command)
-
-server.run(transport="stdio")
-```
-
-然后把这个 MCP server 注册给 Codex CLI。
-
-具体注册命令会随 Codex CLI 版本变化，先查看：
-
-```bash
-codex mcp --help
-```
-
-目标是让 Codex 看到类似两个工具：
-
-```text
-sandbox_run
+~~~text
+sandbox_python
 sandbox_command
-```
+~~~
 
-之后就可以直接告诉 Codex：
+sandbox_python 最终调用：
 
-```text
-用 agentcore-sandbox 执行 Python，生成 1000 个随机数并计算均值和 P95。
-```
+~~~python
+dp.invoke_code_interpreter(
+    codeInterpreterIdentifier=CODE_ID,
+    sessionId=code_session(),
+    name="executeCode",
+    arguments={"language": "python", "code": code, "clearContext": False},
+)
+~~~
 
-Codex 决定何时调用工具，Code Interpreter 负责执行。
+sandbox_command 使用同一个 session 调 executeCommand。
 
-## 五、文件怎么处理
+因此可以让 Codex：
 
-Code Interpreter 内的文件属于临时 session。推荐把工作分成两类：
+~~~text
+使用 sandbox_python 生成 1000 个随机数，计算均值和 P95。
+~~~
 
-```text
-临时文件
-  └─ 留在 Code Interpreter session
+连续工具调用会复用 session，前一次创建的临时文件和执行上下文可以继续使用。
 
-最终产物
-  └─ 显式导出到持久存储
-```
+官方直接调用方式参考：[Using AgentCore Code Interpreter directly](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/code-interpreter-using-directly.html)。
 
-例如：
+## 六、Browser 部分做了什么
 
-```python
-run_python("""
-from pathlib import Path
-Path("outputs").mkdir(exist_ok=True)
-Path("outputs/result.txt").write_text("done", encoding="utf-8")
-print("outputs/result.txt")
-""")
-```
+示例使用 AgentCore BrowserClient 创建托管 Browser session，再通过 Playwright CDP 连接该 session。
 
-然后由你的适配器读取文件，再写到 S3。
+提供的工具是：
 
-不要把二进制文件内容直接塞进模型上下文。模型只需要知道：
-
-- 文件名
-- 大小
-- S3 URI 或下载 ID
-
-## 六、再接 Browser
-
-Browser 与 Code Interpreter 相同，也建议保持一个持续 session。
-
-基本流程：
-
-```text
-Codex
-  ↓
-browser_start
-  ↓
+~~~text
 browser_navigate
-  ↓
-browser_snapshot
-  ↓
-browser_click / browser_fill / browser_press
-  ↓
-browser_extract / browser_screenshot
-```
-
-一个实用的 MCP 工具集合：
-
-```text
-browser_start
-browser_navigate
-browser_snapshot
+browser_text
 browser_click
 browser_fill
-browser_press
-browser_extract
 browser_screenshot
-browser_stop
-```
-
-Codex 不需要知道 Playwright 或 Browser SDK 的内部实现，只需要这些清晰的工具契约。
+~~~
 
 例如：
 
-```text
-使用 agentcore-browser 打开 AWS 中国区 AgentCore 页面，
-读取页面主要内容并保存截图。
-```
+~~~text
+使用 browser_navigate 打开 AWS 中国 AgentCore 页面，
+再用 browser_text 读取页面主要内容。
+~~~
 
-Codex 可以按下面的顺序执行：
+Browser 不是运行在本机 Chrome 中。Playwright 只是通过 CDP 控制 AgentCore Browser session。
 
-```text
-1. browser_start
-2. browser_navigate(url)
-3. browser_snapshot()
-4. 根据 snapshot 判断是否需要点击
-5. browser_extract()
-6. browser_screenshot()
-```
+官方方式参考：[Managing Browser Sessions](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/browser-managing-sessions.html)。
 
-## 七、人工接管 Browser
+## 七、为什么保持持续 session
 
-Agent 浏览网页时，有些情况更适合人来完成：
+如果每个 MCP tool call 都重新创建 session，前后步骤无法共享状态，而且会增加启动开销。
 
-- 登录
-- 验证码
-- 页面布局复杂
-- 需要人工确认
+所以示例采用：
 
-因此 Browser 最好增加两种控制状态：
+~~~text
+Codex process
+  ├─ one Code Interpreter session
+  └─ one Browser session
+~~~
 
-```text
-agent mode
-human mode
-```
+session 的最长时间仍受 AgentCore 服务限制。这个示例适合学习和单用户实践；生产环境还需要考虑用户隔离、并发、超时、持久文件和权限边界。
 
-进入 human mode 后，MCP 浏览器动作应该暂停，避免 Codex 和用户同时操作页面。
+## 八、验证
 
-伪代码：
+先让 Codex 做两个简单任务：
 
-```python
-if browser_mode == "human":
-    raise RuntimeError("Browser is currently controlled by the user")
-```
+~~~text
+用 sandbox_python 计算 21 * 2。
+~~~
 
-用户完成操作后再切回 agent mode，Codex 继续。
+~~~text
+用 browser_navigate 打开 https://www.amazonaws.cn/agentcore/，
+然后读取页面标题和正文前 1000 个字符。
+~~~
 
-这比让 Codex 不断重试登录页更可靠。
+如果 Codex 能看到 MCP tools、Code Interpreter 返回 42、Browser 能返回页面内容，整条链路就已经跑通。
 
-## 八、给 Codex 一段工作区规则
-
-Codex 最好知道这些边界。可以在工作目录放一个 `AGENTS.md`：
-
-```markdown
-# AgentCore tools
-
-需要临时执行代码、安装包或分析数据时，使用 agentcore-sandbox。
-
-Sandbox 是持续会话。工具调用完成后不要主动停止，除非用户明确要求。
-
-需要浏览网页时使用 agentcore-browser。
-
-用户人工接管 Browser 后停止浏览器动作，等待用户交还控制。
-
-最终文件需要显式导出到持久存储。不要把二进制内容直接输出到模型上下文。
-```
-
-这样 Codex 在长期任务中会更稳定地使用这些工具。
-
-## 九、完整实践流程
-
-一个典型任务：
-
-```text
-帮我找三篇 AgentCore 相关资料，提取标题和链接，
-然后用 Python 生成 CSV。
-```
-
-实际执行可以是：
-
-```mermaid
-flowchart TD
-    U[任务] --> C[Codex]
-    C --> B1[Browser 打开搜索结果]
-    B1 --> B2[提取标题和链接]
-    B2 --> C
-    C --> S1[Sandbox 写入数据]
-    S1 --> S2[Python 生成 CSV]
-    S2 --> O[导出最终文件]
-```
-
-关键不是让 Browser 和 Code Interpreter 互相调用，而是 **Codex 作为上层协调者分别调用两类工具**。
-
-## 十、实践时最重要的几条
-
-1. Sandbox 和 Browser 都尽量复用持续 session。
-2. 不要每次工具调用后自动 stop。
-3. Code Interpreter 负责执行，不负责长期文件存储。
-4. Browser 负责网页操作，不负责业务逻辑。
-5. Codex 决定什么时候调用哪个工具。
-6. MCP adapter 只做协议转换、session 管理和必要的安全限制。
-7. 最终产物显式导出，避免把大文件经过模型上下文。
-
-这就是 Codex CLI + AgentCore Code Interpreter + Browser 最小而实用的组合。
+下一章：[Observability 实践](../07-observability/README.md)。
