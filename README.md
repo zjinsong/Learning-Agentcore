@@ -31,32 +31,28 @@ flowchart LR
     G --> T[查询监控等工具]
 ```
 
-## 二、AgentCore 不替你选模型
+## 二、AgentCore 的模型配置方法
 
-模型负责理解语言、生成回答。Runtime 负责运行调用模型的程序。它们是两件事。
+AgentCore Runtime 运行的是你的 Agent 应用，模型由应用自己配置。下面以 DeepSeek 为例：
 
-例如，你在 Runtime 里运行一个 Python 函数，这个函数向某个模型接口发送请求：
+~~~python
+from strands import Agent
+from strands.models.openai import OpenAIModel
 
-```python
-def answer(question):
-    return call_your_model(question)
-```
-
-`call_your_model` 由你按模型服务的接口实现。可以调用可访问的托管模型，也可以调用企业自己部署的模型。模型服务的区域、访问权限、网络和费用，都需要单独确认。“模型独立”不代表每个模型在中国区都能直接访问。
-
-如果模型服务提供兼容 Chat Completions 的 HTTP 接口，常见写法如下；地址、模型名和认证方式以供应商文档为准：
-
-```python
-response = requests.post(
-    model_url,
-    headers={"Authorization": "Bearer " + model_key},
-    json={"model": model_name, "messages": [{"role": "user", "content": question}]},
-    timeout=30,
+model = OpenAIModel(
+    client_args={
+        "api_key": deepseek_api_key,
+        "base_url": "https://api.deepseek.com",
+    },
+    model_id="deepseek-chat",
 )
-response.raise_for_status()
-```
 
-你换了模型，通常改的是这部分调用代码，而不是重新设计 Gateway。[框架与模型选择](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html)
+agent = Agent(model=model)
+~~~
+
+DeepSeek 提供 OpenAI-compatible API，因此可以直接作为模型提供给 Agent。实际项目中 API Key 应放在 Secrets Manager 或其他安全配置中，不要写进代码。
+
+参考：[AgentCore 使用任意模型](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/using-any-model.html)。
 
 ## 三、费用要分开看
 
@@ -82,11 +78,11 @@ response.raise_for_status()
 
 1. **[AWS 中国区功能介绍](01-china/README.md)**：组件怎么分工，Global 有哪些不同，缺失能力如何处理。
 2. **[Vibe coding MCP 使用](02-mcp/README.md)**：给编码助手接入 AgentCore MCP，让它帮你查文档和写代码。
-3. **[服务构建指南](03-build/README.md)**：从本地程序到 Runtime，再连上 Gateway；一步一步解释 botocore 部署。
-4. **[Agent 应用例子](04-agents/README.md)**：构建监控、审计两个 Agent，再认识 Identity 的用途。
+3. **[服务构建指南](03-build/README.md)**：先把 Runtime、Gateway 和 MCP 工具链搭起来，理解 AgentCore 的基础设施。
+4. **[完整 Agent 实践](04-agents/README.md)**：在第三章基础上加入 DeepSeek 和 Agent loop，让 Agent 自主调用 Gateway tools。
 5. **[Harness 实践](05-harness/README.md)**：把多个步骤组织成能够完成、失败时也能结束的任务。
 6. **[Code Interpreter + Browser - Codex 实践](06-codex-tools/README.md)**：让 Codex CLI 通过 MCP 使用持续 Code Interpreter 和 Browser 会话。
-7. **[Observability 实践](07-observability/README.md)**：用 CloudWatch 指标观察 Agent Runtime 和 Gateway。
+7. **[Observability 实践](07-observability/README.md)**：用 AgentCore Observability 和 CloudWatch 查看指标、日志与 Trace。
 
 教程的运维例子借鉴 [AWS CloudOps 示例](https://github.com/aws-samples/sample-cloudops-multi-agent-system)，但不要求你部署完整 CloudOps 项目。这里使用独立的学习资源，不包含某个线上环境的 IP、账户信息或密码。
 
