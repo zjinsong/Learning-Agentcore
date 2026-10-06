@@ -2,11 +2,11 @@
 
 很多人到这一步会问：既然程序在 8080 端口运行，我直接请求云上的 8080 不就行了吗？
 
-不是。**容器内的入口和云端对外接口，是两层接口。**
+容器入口与 Runtime 对外调用接口属于两个层次。
 
 ## 一、服务契约是什么
 
-可以把“契约”理解为接口约定。AgentCore 知道往哪个端口、哪个路径发请求，你的程序就必须在那个位置接收，并按规定返回。
+Runtime 要求容器按规定的端口和路径接收请求并返回响应。
 
 Runtime 的服务契约区分四种协议：[官方服务契约](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/runtime-service-contract.html)。
 
@@ -49,7 +49,7 @@ sequenceDiagram
     S-->>C: 返回响应
 ```
 
-你不是 SSH 到某台 AgentCore 机器，也不是把 MicroVM 的 8080 暴露给浏览器。应用本地路径的约定，不是对外公开地址。
+调用方通过 AgentCore 数据面访问 Runtime，不直接访问 MicroVM 的 8080 端口。
 
 ## 四、IAM 调用：botocore 自动签名
 
