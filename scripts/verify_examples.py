@@ -228,7 +228,7 @@ class DeploymentShapeTests(unittest.TestCase):
             stack.enter_context(patch.object(model, "__file__", str(root / "examples/agents/configure_model.py")))
             stack.enter_context(patch.object(model, "AwsSession", return_value=session))
             stack.enter_context(patch.object(model, "getpass", return_value="fixture-only"))
-            with patch("builtins.input", return_value="deepseek-chat"):
+            with patch("builtins.input", return_value="deepseek-v4-pro"):
                 model.main()
             api = root / ".local/tickets.yaml"
             api.write_text("openapi: 3.0.3\n", encoding="utf-8")
