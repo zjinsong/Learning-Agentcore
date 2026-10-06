@@ -1,6 +1,6 @@
 # 第七章：Observability 实践
 
-Agent 部署后，最基本要知道三件事：有没有被调用、是否出错或变慢、一次请求内部发生了什么。
+AgentCore Observability 用于查看 AgentCore 资源指标、Runtime 日志和应用 Trace。
 
 AgentCore Observability 把这些信息送到 CloudWatch。官方入口：[AgentCore Observability](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/observability.html)。
 
@@ -8,7 +8,7 @@ AgentCore Observability 把这些信息送到 CloudWatch。官方入口：[Agent
 
 AgentCore 会为 Runtime、Gateway 等资源提供一组内置指标。Runtime 常见关注项包括调用量、Session、延迟、Duration、错误和 CPU/Memory 使用量。
 
-这些服务级指标不要求你自己写 CloudWatch 查询程序。学习阶段直接从 CloudWatch 的 GenAI Observability 页面查看即可。
+这些服务级指标可直接在 CloudWatch GenAI Observability 中查看。
 
 ## 二、Metrics、Logs、Trace 分别看什么
 
@@ -18,13 +18,13 @@ AgentCore 会为 Runtime、Gateway 等资源提供一组内置指标。Runtime �
 | Logs | Runtime 输出和具体错误信息 |
 | Trace / Span | 一次 Agent 请求内部的模型调用、工具调用和耗时路径 |
 
-通常先看 Metrics 判断有没有异常，再进入 Logs 或 Trace 找原因。
+常用排查顺序是 Metrics → Trace/Span → Logs。
 
 ## 三、ADOT 是什么
 
 ADOT 是 AWS Distro for OpenTelemetry。OpenTelemetry 定义 Trace、Span、Metrics、Logs 等遥测标准；ADOT 是 AWS 提供的 OpenTelemetry 发行版，用来把 Agent 应用产生的 telemetry 接入 AWS 的观测体系。
 
-AgentCore 自己提供的基础指标与应用内部的详细 Trace 不是一回事。想看到更完整的 Agent 执行过程，需要让 Agent framework 发出 OTEL telemetry，并按官方方式启用 ADOT instrumentation。
+AgentCore 提供基础资源指标；应用级 Trace/Span 需要 Agent framework 产生 OpenTelemetry telemetry，并启用相应 instrumentation。
 
 ## 四、开启完整 Agent 观测
 
@@ -63,7 +63,7 @@ Metrics 发现异常
 结合 Runtime Logs 定位原因
 ~~~
 
-这就是 AgentCore Observability 最核心的使用方式。学习阶段先把这条链路跑通，不需要自己开发一套观测平台。
+以上流程即可覆盖本教程的基础观测需求。
 
 参考：[AgentCore Observability](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/observability.html)、[Runtime observability data](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/observability-runtime-metrics.html)。
 
