@@ -228,7 +228,7 @@ class DeploymentShapeTests(unittest.TestCase):
             stack.enter_context(patch.object(model, "__file__", str(root / "examples/agents/configure_model.py")))
             stack.enter_context(patch.object(model, "AwsSession", return_value=session))
             stack.enter_context(patch.object(model, "getpass", return_value="fixture-only"))
-            with patch("builtins.input", side_effect=["https://model.example.com/v1/chat/completions", "fixture-model"]):
+            with patch("builtins.input", return_value="deepseek-chat"):
                 model.main()
             api = root / ".local/tickets.yaml"
             api.write_text("openapi: 3.0.3\n", encoding="utf-8")
@@ -243,3 +243,28 @@ class DeploymentShapeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+    def test_agentcore_tool_request_shapes(self):
+        session = botocore.session.get_session()
+        model = session.get_service_model("bedrock-agentcore")
+        cases = [
+            ("StartCodeInterpreterSession", {
+                "codeInterpreterIdentifier": "aws.codeinterpreter.v1",
+                "name": "tutorial-code",
+                "sessionTimeoutSeconds": 3600,
+            }),
+            ("InvokeCodeInterpreter", {
+                "codeInterpreterIdentifier": "aws.codeinterpreter.v1",
+                "sessionId": "session123",
+                "name": "executeCode",
+                "arguments": {"language": "python", "code": "print(42)", "clearContext": False},
+            }),
+            ("StartBrowserSession", {
+                "browserIdentifier": "aws.browser.v1",
+                "name": "tutorial-browser",
+                "sessionTimeoutSeconds": 3600,
+            }),
+        ]
+        for operation, params in cases:
+            validate_parameters(params, model.operation_model(operation).input_shape)
+
