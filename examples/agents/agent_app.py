@@ -40,7 +40,7 @@ def build_model(region):
             "base_url": config.get("base_url", "https://api.deepseek.com"),
             "timeout": 60,
         },
-        model_id=config.get("model", "deepseek-chat"),
+        model_id=config.get("model", "deepseek-v4-pro"),
         params={"temperature": 0.2, "max_tokens": 2048},
     )
 
