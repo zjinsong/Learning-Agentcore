@@ -1,182 +1,190 @@
-# 第四章：Agent 应用例子
+# 第四章：构建一个完整 Agent
 
-基础设施已经有了。现在做一个小应用：查询服务器运行情况，再查询今天是否有人发起关机。
+第三章已经验证了 Runtime → Gateway → Lambda 工具链。这一章不再重新做一套调用流程，而是在这个基础上加入模型和 Agent loop。
 
-我们只用两个 Agent：**监控 Agent** 和 **审计 Agent**。这两种分工来自常见 CloudOps 场景，例子本身独立运行，不需要复制完整项目。
+示例仍然很小：监控 Agent 查询 EC2/CloudWatch，审计 Agent 查询 CloudTrail。两个 Agent 都运行在 AgentCore Runtime，模型使用 DeepSeek，工具来自第三章介绍的 AgentCore Gateway。
 
-## 一、先明确各自的工作
-
-监控 Agent 负责发现实例、查看 CPU 等指标。审计 Agent 负责查 CloudTrail 管理事件。它们各有入口、工具清单和权限。
-
-```mermaid
+~~~mermaid
 flowchart LR
-    M[监控 Agent 的 Runtime] --> G[Gateway]
-    A[审计 Agent 的 Runtime] --> G
-    G --> ML[监控 Lambda]
-    G --> AL[审计 Lambda]
-    ML --> EC[EC2 / CloudWatch]
-    AL --> CT[CloudTrail]
-```
+    U[用户自然语言] --> R[AgentCore Runtime]
+    R --> A[Agent]
+    A <--> M[DeepSeek]
+    A <--> G[AgentCore Gateway]
+    G --> T[Lambda MCP Tool]
+    T --> W[AWS API]
+~~~
 
-Runtime 运行 Agent 代码。Gateway 连接工具。Lambda 查询数据。模型可以帮助 Agent 选择任务、组织结果；查询数据仍由工具完成。本章代码先实现模型选择任务，回答整理放在第五章讨论。
+## 一、这一章增加了什么
 
-## 二、把工具写小
+第三章的重点是基础设施：Runtime 怎么部署，Gateway 怎么注册 target，MCP 工具怎么调用。
 
-不要做一个“任意执行 AWS 命令”的万能工具。先给监控 Agent 两种操作，审计 Agent 一种操作：
+这一章的重点是 Agent：
 
-| 操作 | 输入 | 输出 |
-| --- | --- | --- |
-| discover | 区域 | 运行中的实例 ID |
-| metrics | 实例 ID、开始/结束时间 | 按实例分组的 CPU 数据 |
-| audit | 开始/结束时间 | StopInstances 请求记录与涉及实例 |
+1. 用 DeepSeek 作为模型。
+2. 用 Strands 创建 Agent。
+3. 把 Gateway 返回的 MCP tools 交给 Agent。
+4. 让 Agent 根据自然语言决定什么时候调用工具、调用几次，再根据真实结果回答。
 
-没有实例 ID，就先发现实例。查性能时不能用账户聚合值猜具体实例；审计结果也不能仅凭 CPU 下降判断是否关机。
+因此不再使用“模型先生成 JSON，再由 Python if/else 执行”的手写流程。
 
-参考查询核心如下：
+## 二、代码结构
 
-```python
-pages = ec2.get_paginator("describe_instances").paginate(
-    Filters=[{"Name": "instance-state-name", "Values": ["running"]}]
+完整代码在 examples/agents：
+
+~~~text
+examples/agents/
+├── agent_app.py
+├── gateway_tools.py
+├── configure_model.py
+├── build.py
+├── invoke.py
+├── tools.py
+├── aws_session.py
+├── Dockerfile
+└── requirements.txt
+~~~
+
+agent_app.py 是 Runtime 中真正运行的 Agent。gateway_tools.py 负责用 IAM/SigV4 连接 Gateway，并把 MCP tools 加载成 Strands 可以直接使用的工具。
+
+核心关系很简单：
+
+~~~python
+model = OpenAIModel(
+    client_args={
+        "api_key": config["key"],
+        "base_url": "https://api.deepseek.com",
+    },
+    model_id=config.get("model", "deepseek-chat"),
 )
-for page in pages:
-    for reservation in page["Reservations"]:
-        for instance in reservation["Instances"]:
-            instance_ids.append(instance["InstanceId"])
-```
 
-发现实例后再查询 `AWS/EC2` 的 `CPUUtilization`，维度是 `InstanceId`。操作系统内存不在基础 EC2 指标里，需要另行采集，不能假造。
+with gateway_tools(gateway_url, region, kind) as tools:
+    agent = Agent(
+        model=model,
+        tools=tools,
+        system_prompt=PROMPTS[kind],
+    )
+    answer = agent(question)
+~~~
 
-## 三、按用途拆角色
+这里的 OpenAIModel 表示使用 OpenAI-compatible API，并不表示调用 OpenAI。DeepSeek 提供兼容接口，所以只需要配置 base_url、API Key 和模型名。
 
-| 角色 | 允许操作 |
-| --- | --- |
-| 监控 Lambda 角色 | ec2:DescribeInstances、cloudwatch:GetMetricStatistics、自己的日志 |
-| 审计 Lambda 角色 | cloudtrail:LookupEvents、自己的日志 |
-| 两个 Runtime 角色 | 拉镜像、写日志、InvokeGateway；模型需要的独立权限 |
-| Gateway 角色 | 调用本例的两个 Lambda |
+模型配置方法参考：[Using any foundation model](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/using-any-model.html)。
 
-部分只读 API 不支持资源级 ARN 约束，可能需要 `Resource: "*"`；仍需限定 Action、区域、输入和输出，不授予修改实例的权限。
+## 三、工具仍然走 Gateway
 
-工具前缀筛选有助于路由，但不是完整 IAM 隔离。共享 Gateway 需要在工具端或应用授权层继续验证访问身份；多租户或敏感场景可以拆 Gateway 与角色，不能只靠“模型不要调用别的工具”。
+监控和审计工具沿用第三章的 Gateway 思路，只是本章增加两个 target：
 
-## 四、沿用第三章的构建方法
-
-创建两个 Lambda，入口都可使用参考 `tools.py`；分别设置 `TOOL_KIND=monitoring` 和 `TOOL_KIND=audit`。代码会拒绝不属于该类型的操作。
-
-把各自参数写入 schema，注册两个 target，命名 `monitoring` 和 `audit`。业务工具名均为 `cloud_query`，实际调用名取 tools/list 返回，通常是：
-
-```text
-monitoring___cloud_query
-audit___cloud_query
-```
-
-创建过程和第三章一致：打包函数、创建角色、等待函数可用、授权 Gateway、注册 target、等待 READY、实际调用。
-
-然后用参考 `agent_app.py` 构建 Agent 镜像，按第三章创建两个不同名称的 Runtime。每个 Runtime 指定三个环境变量：
-
-| 变量 | 监控 Agent | 审计 Agent |
+| Agent | Gateway target | 能做什么 |
 | --- | --- | --- |
-| EXPERT_KIND | monitoring | audit |
-| GATEWAY_URL | 服务返回的 Gateway URL | 同一个学习 Gateway URL |
-| TOOL_REGION | cn-northwest-1 | cn-northwest-1 |
+| monitoring | monitoring | discover、metrics |
+| audit | audit | audit |
 
-第三章脚本只创建固定名称的入门 Runtime。这里使用本章的分步辅助脚本：
+模型不会直接获得 AWS 凭证去查询 EC2、CloudWatch 或 CloudTrail。它只能调用分配给自己的 Gateway tool；Lambda 再按自己的 IAM role 查询 AWS API。
 
-```bash
+例如用户问：
+
+~~~text
+检查当前运行中的 EC2，并看看 CPU 情况。
+~~~
+
+监控 Agent 可以先调用 discover，取得真实实例 ID，再调用 metrics。这个多步过程由 Agent loop 完成，不需要 Python 预先写死调用顺序。
+
+## 四、部署两个工具和两个 Runtime
+
+先完成第三章，确保 .local/gateway.json 已存在，并且学习 Gateway 可用。
+
+然后：
+
+~~~bash
+python -m pip install -r examples/agents/requirements.txt
+
 python examples/agents/build.py lambda
 python examples/agents/build.py roles
-```
+~~~
 
-第一步部署两种 Lambda、挂载 target。第二步创建两种 Runtime 角色和镜像仓库，把待部署信息保存在 `.local/agents.json`。之后构建镜像：
+构建并上传 Runtime 镜像：
 
-```bash
+~~~bash
 agent_image_uri=$(jq -r .repository_uri .local/agents.json)
 agent_region=$(jq -r .region .local/agents.json)
 registry=${agent_image_uri%%/*}
-aws ecr get-login-password --region "$agent_region" | docker login --username AWS --password-stdin $registry
+
+aws ecr get-login-password --region "$agent_region" | docker login --username AWS --password-stdin "$registry"
 docker buildx build --platform linux/arm64 --provenance=false --load -t tutorial-agents:v1 examples/agents
 docker tag tutorial-agents:v1 "${agent_image_uri}:v1"
 docker push "${agent_image_uri}:v1"
+
 python examples/agents/build.py runtimes
-```
+~~~
 
-两个 Runtime 复用同一镜像，但环境变量和角色独立，分别执行自己的任务。
+两个 Runtime 复用同一个镜像，通过 EXPERT_KIND 区分 monitoring 和 audit。
 
-## 五、先用结构化请求验证工具链
+## 五、配置 DeepSeek
 
-向监控 Agent 发：
+模型 API Key 不写入仓库或镜像。运行：
 
-```json
-{"task":"discover"}
-```
-
-从终端发出这两个真实调用：
-
-```bash
-python examples/agents/invoke.py --expert monitoring --task discover
-python examples/agents/invoke.py --expert audit --task audit
-```
-
-查询指标需要真实发现的 ID。将下面占位文字替换为发现结果中的一台实例 ID：
-
-```bash
-python examples/agents/invoke.py --expert monitoring --task metrics --instance-id "替换为真实实例ID"
-```
-
-辅助脚本计算北京时间今天的时间窗。代码验证输入后调用相应 Gateway 工具，不调用模型。调用者必须有对应 Runtime 的调用权限，执行角色不能替调用者授予入站权限。
-
-这一步只是链路测试。不是声称一个 if/else 程序已经具有自然语言理解能力。
-
-## 六、加入模型，才处理自然语言
-
-对于“查今天的关机记录”这类问题，Agent 可让模型生成受限的任务 JSON，再校验并调用工具。监控 Agent 只允许 discover/metrics，审计 Agent 只允许 audit。
-
-参考应用支持可选 `MODEL_SECRET_ARN`：在你自己的 Secrets Manager 中保存模型接口配置，给 Runtime 角色仅授予该 Secret 的 GetSecretValue。配置包含 `url`、`key`、`model`，只用于支持相应 Chat Completions 接口的服务。
-
-准备好可访问的模型接口后，执行下面可选步骤：
-
-```bash
+~~~bash
 python examples/agents/configure_model.py
-```
+~~~
 
-程序分别询问完整 HTTPS 接口地址、模型名与 Key，创建本实验专用 Secret `tutorial-agent-model`。Key 不回显，也不保存在仓库文件中。然后它给两个 Runtime 角色追加限定 Secret 的权限，并在保留原环境变量的前提下更新 Runtime。已有同名 Secret 时先核对，不覆盖。
+脚本会安全读取 DeepSeek API Key，默认模型是 deepseek-chat，把配置保存到本实验专用 Secrets Manager Secret，并只给两个 Runtime role 读取该 Secret 的权限。
 
-模型有自己的身份、网络和计费。未设置这项配置时，程序只接受结构化请求，并明确提示自然语言模式尚未配置；不会偷偷使用某个 Global 模型。
+Runtime 中最终得到的模型配置类似：
 
-```json
-{"question":"查询今天发起的关机操作"}
-```
+~~~python
+OpenAIModel(
+    client_args={
+        "api_key": key,
+        "base_url": "https://api.deepseek.com",
+    },
+    model_id="deepseek-chat",
+)
+~~~
 
-对应调用命令：
+AgentCore Runtime 负责托管 Agent；模型仍由 Agent 应用自己配置。
 
-```bash
-python examples/agents/invoke.py --expert audit --question "查询今天发起的关机操作"
-```
+## 六、直接用自然语言测试
 
-模型返回必须通过任务和参数校验；不要直接把模型生成的任意字符串当作云命令运行。模型最终整理回答时，也应保留工具证据和未解决项。
+监控：
 
-## 七、Identity 在哪里加入
+~~~bash
+python examples/agents/invoke.py   --expert monitoring   --question "找出当前运行中的 EC2，并查询它们今天的 CPU 情况"
+~~~
 
-上面的 AWS 查询使用 IAM，不必添加 API Key。现在增加一个外部工单 API，才会用到 Identity。
+审计：
 
-```mermaid
-flowchart LR
-    A[Agent] --> G[Gateway：工单工具]
-    G -->|获取凭证| I[Identity：API Key Provider]
-    I -->|凭证供 Gateway 使用| G
-    G -->|X-API-Key| T[你的外部工单 API]
-```
+~~~bash
+python examples/agents/invoke.py   --expert audit   --question "查询今天是否有人发起过 EC2 StopInstances"
+~~~
 
-Gateway 负责“怎么调用工单工具”，Identity 负责“访问工单系统要用什么凭证”。外部系统真正允许查询哪些工单，仍由那个系统的 Key 权限决定。
+调用链应该是：
 
-完整操作在 [Identity：接入外部工单服务](identity.md)。这部分需要你拥有的可访问 API，不把某个真实企业接口写入公开教程。
+~~~text
+invoke.py
+  → AgentCore Runtime
+  → Strands Agent
+  → DeepSeek 判断是否需要工具
+  → AgentCore Gateway
+  → Lambda MCP Tool
+  → AWS API
+  → 工具结果返回 Agent
+  → DeepSeek 组织最终回答
+~~~
 
-## 八、验证时别忽略边界
+这才是本章要验证的完整 Agent 行为。
 
-“今天”在本例按北京时间计算，再转换 UTC 查询。CloudTrail 中失败的 StopInstances 请求不代表关机成功；成功的 API 请求也不能独自证明系统已经完全关闭。空指标不等于 CPU 为零。
+## 七、Identity 放在哪里
 
-当前运行中实例不代表今天运行过的所有实例。审计查询应独立检查今天的事件，再关联资源。
+上面的 AWS 工具使用 IAM，不需要额外 API Key Provider。
 
-最后参考：[Agent 应用](../examples/agents/agent_app.py)、[业务工具](../examples/agents/tools.py)、[构建步骤](../examples/agents/build.py)、[调用脚本](../examples/agents/invoke.py)、[模型配置](../examples/agents/configure_model.py)、[AWS 多 Agent 示例](https://github.com/aws-samples/sample-cloudops-multi-agent-system)。
+如果 Agent 还要通过 Gateway 调用一个使用 API Key 的外部系统，再加入 AgentCore Identity。完整例子见 [Identity：接入外部工单服务](identity.md)。
+
+Identity 解决外部凭证管理，不负责模型选择，也不代替 Runtime 或 Gateway 的 IAM 权限。
+
+## 八、这一章学到了什么
+
+第三章让基础链路跑通；第四章把同一套 Runtime/Gateway 思路变成真正的 Agent 应用。
+
+关键边界是：模型负责理解和决策，Agent loop 负责模型与工具之间的循环，Gateway 提供受控工具，AWS 数据仍由工具用真实 API 查询。
 
 下一章：[Harness 实践](../05-harness/README.md)。

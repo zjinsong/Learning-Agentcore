@@ -1,75 +1,102 @@
-"""Two specialist Runtime applications: structured tasks, with optional model planning."""
-from datetime import datetime, time, timedelta, timezone
+"""Two small Strands agents hosted by AgentCore Runtime and using Gateway MCP tools."""
 import json
 import os
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from gateway_client import GatewayClient
+from strands import Agent
+from strands.models.openai import OpenAIModel
+
 from aws_session import AwsSession
-import requests
+from gateway_client import GatewayClient
+from gateway_tools import gateway_tools
 
 app = BedrockAgentCoreApp()
 
+PROMPTS = {
+    "monitoring": (
+        "You are a read-only monitoring agent for AWS China. "
+        "Use only the monitoring Gateway tool. Discover real running instances before querying metrics "
+        "when the user did not provide instance IDs. Never invent resource IDs or metric values."
+    ),
+    "audit": (
+        "You are a read-only audit agent for AWS China. "
+        "Use only the audit Gateway tool to inspect CloudTrail StopInstances events. "
+        "Distinguish failed API requests from successful requests and never invent events."
+    ),
+}
 
-def plan(question, kind, region):
+
+def build_model(region):
     secret_arn = os.environ.get("MODEL_SECRET_ARN")
     if not secret_arn:
-        raise ValueError("Natural-language mode requires MODEL_SECRET_ARN; use a structured task first")
-    secret = AwsSession(region_name=region).client("secretsmanager").get_secret_value(SecretId=secret_arn)
+        raise RuntimeError("MODEL_SECRET_ARN is not configured; run configure_model.py first")
+    secret = AwsSession(region_name=region).client("secretsmanager").get_secret_value(
+        SecretId=secret_arn
+    )
     config = json.loads(secret["SecretString"])
-    zone = timezone(timedelta(hours=8))
-    now = datetime.now(zone)
-    day_start = datetime.combine(now.date(), time.min, tzinfo=zone)
-    instruction = (
-        f"You are a {kind} specialist. Return ONLY JSON. "
-        "Allowed fields: task, instance_ids, start, end. "
-        f"Allowed tasks: {['discover', 'metrics'] if kind == 'monitoring' else ['audit']}. "
-        "Metrics requires actual instance IDs supplied by the user; otherwise select discover. "
-        "Do not invent resource IDs. start/end must be ISO timestamps with timezone. "
-        f"Today in Beijing starts {day_start.isoformat()}, now {now.isoformat()}. "
-        "Plan one operation, no shell commands.")
-    response = requests.post(config["url"], headers={"Authorization": "Bearer " + config["key"]},
-        json={"model": config["model"], "messages": [{"role": "system", "content": instruction},
-             {"role": "user", "content": question}]}, timeout=(5, 30))
-    response.raise_for_status()
-    return json.loads(response.json()["choices"][0]["message"]["content"])
+    return OpenAIModel(
+        client_args={
+            "api_key": config["key"],
+            "base_url": config.get("base_url", "https://api.deepseek.com"),
+            "timeout": 60,
+        },
+        model_id=config.get("model", "deepseek-chat"),
+        params={"temperature": 0.2, "max_tokens": 2048},
+    )
 
 
-def execute(event, kind, region):
+def execute_structured(event, kind, region):
     allowed = {"monitoring": {"discover", "metrics"}, "audit": {"audit"}}
     task = event.get("task")
     if task not in allowed.get(kind, set()):
         raise ValueError("Unsupported task for this specialist")
-    args = {"action": task, "region": region}
+    arguments = {"action": task, "region": region}
     if task != "discover":
-        args.update(start=event["start"], end=event["end"])
+        arguments.update(start=event["start"], end=event["end"])
     if task == "metrics":
-        args["instance_ids"] = event["instance_ids"]
+        arguments["instance_ids"] = event["instance_ids"]
+
     gateway = GatewayClient(os.environ["GATEWAY_URL"], region)
     gateway.initialize()
     tool_name = kind + "___cloud_query"
-    if tool_name not in {t["name"] for t in gateway.list_tools()}:
+    if tool_name not in {tool["name"] for tool in gateway.list_tools()}:
         raise RuntimeError("Expected specialist tool is not registered")
-    response = gateway.rpc("tools/call", {"name": tool_name, "arguments": args})
+    response = gateway.rpc("tools/call", {"name": tool_name, "arguments": arguments})
     if response.get("isError"):
         raise RuntimeError("Tool execution failed")
     if response.get("structuredContent") is not None:
         return response["structuredContent"]
-    contents = response.get("content", [])
-    texts = [item["text"] for item in contents if item.get("type") == "text"]
+    texts = [item["text"] for item in response.get("content", []) if item.get("type") == "text"]
     if len(texts) != 1:
         raise ValueError("Expected one JSON tool result")
     return json.loads(texts[0])
 
 
 @app.entrypoint
-def handler(event, context):
+def handler(event, context=None):
     kind = os.environ.get("EXPERT_KIND", "monitoring")
     region = os.environ.get("TOOL_REGION", "cn-northwest-1")
-    if event.get("question"):
-        event = plan(event["question"], kind, region)
-    result = execute(event, kind, region)
-    return {"expert": kind, "status": "succeeded", "result": result}
+    if kind not in PROMPTS:
+        return {"error": "unsupported expert kind"}
+
+    if event.get("task"):
+        result = execute_structured(event, kind, region)
+        return {"expert": kind, "status": "succeeded", "result": result}
+
+    question = event.get("question") or event.get("prompt")
+    if not question:
+        return {"error": "question, prompt or task is required"}
+
+    with gateway_tools(os.environ["GATEWAY_URL"], region, kind) as tools:
+        if not tools:
+            raise RuntimeError(f"No Gateway tools loaded for {kind}")
+        agent = Agent(
+            model=build_model(region),
+            tools=tools,
+            system_prompt=PROMPTS[kind],
+        )
+        answer = str(agent(question))
+    return {"expert": kind, "status": "succeeded", "answer": answer}
 
 
 if __name__ == "__main__":
