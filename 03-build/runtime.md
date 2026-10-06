@@ -2,11 +2,11 @@
 
 先做一个最小程序。你发 `hello`，它返回 `Received: hello`。
 
-它暂时不调用模型。这样，第一步出错时，你只需排查应用和 Runtime，不必同时猜测模型网络、工具权限和数据问题。
+本章 Runtime 暂不调用模型，用于单独验证应用入口、容器和 Runtime 部署。
 
 ## 一、给程序一个入口
 
-普通 Python 函数不会自动变成云端接口。我们使用 AgentCore SDK 提供的应用对象：
+使用 AgentCore SDK 定义 Runtime 应用入口：
 
 ```python
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
