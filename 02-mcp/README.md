@@ -1,10 +1,8 @@
 # 第二章：Vibe coding MCP 使用
 
-现在你知道 Runtime 和 Gateway 做什么了。接下来，找一个帮你写程序的助手。
+本章介绍如何在 Kiro、Claude Code 和 Codex 中接入 Amazon Bedrock AgentCore MCP Server，用于查询 AgentCore 文档和辅助开发。
 
-Kiro、Claude Code、Codex 都能协助编码。但一个助手能写 Python，不代表它知道最新的 AgentCore 接口。**MCP 让它可以先查文档，再按文档动手。**
-
-## 一、这个 MCP 装在哪里
+## 一、连接方式
 
 Amazon Bedrock AgentCore MCP Server 安装在你的开发环境，由编码助手连接。
 
@@ -12,11 +10,11 @@ Amazon Bedrock AgentCore MCP Server 安装在你的开发环境，由编码助�
 你 → 编码助手 → AgentCore MCP → 文档与开发辅助工具
 ```
 
-官方入门介绍了改造应用、部署和测试的对话流程。实际安装版本提供哪些工具，要在客户端工具列表里查看。部署还需要相应终端或工具、AWS 身份与权限。[AWS MCP 入门](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/mcp-getting-started.html)
+实际可用工具以客户端中的 MCP tool 列表为准。部署资源仍需要有效的 AWS 身份与权限。[AWS MCP 入门](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/mcp-getting-started.html)
 
-不要把它和 Gateway 混起来。这个 MCP 帮开发者构建应用；Gateway 是部署后的 Agent 访问业务工具的入口。
+AgentCore MCP Server 面向开发阶段；Gateway 面向运行阶段的 Agent 工具访问。
 
-## 二、准备一个能启动 MCP 的命令
+## 二、准备 uvx
 
 配置里的 `uvx` 是启动程序的命令。它由 uv 提供，可以下载并运行 Python 工具包。
 
@@ -26,9 +24,9 @@ Amazon Bedrock AgentCore MCP Server 安装在你的开发环境，由编码助�
 uvx --version
 ```
 
-能看到版本号再继续。首次启动会下载包，需要网络。下面使用 `@latest` 方便入门；验证完成后，可以锁定具体版本。
+首次启动会下载包，需要可用网络。示例使用 `@latest`；生产环境建议固定版本。
 
-查文档可以先不设置部署身份。真正部署前，再按第三章设置 AWS 中国区身份。
+仅查询文档时可不配置部署身份；创建资源前按第三章配置 AWS 身份。
 
 ## 三、Kiro：添加一个配置文件
 
@@ -95,9 +93,9 @@ FASTMCP_LOG_LEVEL = "ERROR"
 
 AWS 入门没有明确列出 Codex。这里按 Codex 的标准 stdio MCP 接口连接同一个包，是否成功以实际连接测试为准。
 
-## 六、先问一个小问题
+## 六、验证 MCP
 
-配置完成后，不要一上来要求“部署整个系统”。先验证文档工具。
+配置完成后，先验证文档查询工具。
 
 ```text
 请通过 AgentCore MCP 查阅 Runtime 的 HTTP 协议要求。
@@ -105,11 +103,11 @@ AWS 入门没有明确列出 Codex。这里按 Codex 的标准 stdio MCP 接口�
 不要创建云资源。
 ```
 
-成功时，你应看到真实的工具调用记录。回答应解释 ARM64、8080、`/invocations`、`/ping`。只有一段看似正确的回答，不能证明 MCP 已经连上。
+成功时客户端应显示 MCP tool 调用记录，并返回 ARM64、8080、`/invocations`、`/ping` 等 Runtime 协议信息。
 
-## 七、让它一步步帮你做
+## 七、开发示例
 
-然后按下面三个小任务推进：
+可按以下顺序使用 MCP 辅助开发：
 
 **任务一：改造入口。**
 
@@ -133,12 +131,12 @@ AWS 入门没有明确列出 Codex。这里按 Codex 的标准 stdio MCP 接口�
 解释每一层权限，列举工具，再从 Runtime 调用它。
 ```
 
-中国区部署方式以第三章为准，不让助手直接照搬 Global 的 Cognito 或 Managed EC2 示例。MCP 提供帮助，理解步骤和验收仍由你掌握。
+中国区部署方式以第三章为准，避免直接套用 Global 的 Cognito 或 Managed EC2 配置。
 
-## 八、连接失败先看什么
+## 八、故障排查
 
-工具没有出现，先看 Server 启动日志。找不到 uvx，就查客户端所在环境的 PATH。GUI 和终端可能使用不同环境；终端能找到命令，不代表图形客户端能找到。
+工具未出现时，检查 MCP Server 启动日志和客户端 PATH。GUI 客户端与终端可能使用不同环境变量。
 
-能查文档却部署失败，检查 AWS 身份和权限。文档服务能访问，不代表你有创建云资源的权限。
+文档查询正常但部署失败时，检查 AWS 身份、区域和 IAM 权限。
 
 下一章：[服务构建指南](../03-build/README.md)。
