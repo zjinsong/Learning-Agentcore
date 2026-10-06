@@ -66,3 +66,6 @@ Metrics 发现异常
 这就是 AgentCore Observability 最核心的使用方式。学习阶段先把这条链路跑通，不需要自己开发一套观测平台。
 
 参考：[AgentCore Observability](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/observability.html)、[Runtime observability data](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/observability-runtime-metrics.html)。
+
+
+完成观测实践后，进入最后一章：[Cleanup](../08-cleanup/README.md)，统一删除本教程创建的 AWS 资源。
