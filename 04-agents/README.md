@@ -44,7 +44,7 @@ examples/agents/
 └── requirements.txt
 ~~~
 
-agent_app.py 是 Runtime 中真正运行的 Agent。gateway_tools.py 负责用 IAM/SigV4 连接 Gateway，并把 MCP tools 加载成 Strands 可以直接使用的工具。
+`agent_app.py` 是 Runtime 中运行的 Agent；`gateway_tools.py` 使用 IAM/SigV4 连接 Gateway，并将 MCP tools 加载到 Strands Agent。
 
 核心调用链：
 
