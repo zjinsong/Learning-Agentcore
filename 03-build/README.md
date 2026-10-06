@@ -1,8 +1,6 @@
 # 第三章：服务构建指南
 
-这一章从一个普通 Python 程序开始。
-
-我们先让它返回一句话，再把它放到 Runtime，最后接上一个 Gateway 工具。读完后，你应能解释每一步，而不是只会运行一条“部署全部”的命令。
+本章部署一个基础 Runtime，并创建 Gateway + Lambda MCP tool，验证 Runtime → Gateway → Tool 调用链路。
 
 ```mermaid
 flowchart LR
@@ -14,7 +12,7 @@ flowchart LR
     G --> L[Lambda 工具]
 ```
 
-## 一、先分清三个东西
+## 一、组件关系
 
 **代码**决定接到请求后做什么。**镜像**把代码和依赖打包。**Runtime**把镜像运行起来，并提供外部调用接口。
 
@@ -85,7 +83,7 @@ aws sts get-caller-identity --region cn-northwest-1
 | Gateway 角色 | 调用注册的工具 | InvokeFunction 到指定 Lambda |
 | Lambda 角色 | 运行查询代码 | 写日志；业务例子再增加只读查询动作 |
 
-可以把部署者理解为安装人员，执行角色理解为程序运行时的工作证。安装人员有权限，不代表程序运行后也有这些权限。
+部署身份用于创建和更新资源；Runtime execution role 仅用于应用运行时访问 AWS 资源。两者权限应分别配置。
 
 AWS 凭证不能写进容器。程序通过执行角色获得必要的访问权限。部署者需要 `iam:PassRole`，表示允许把相应角色交给服务使用。[Runtime 权限](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/runtime-permissions.html)、[Gateway 权限](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/gateway-prerequisites-permissions.html)
 
