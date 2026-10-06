@@ -15,7 +15,7 @@ def main():
     if state.get("model_secret_arn"):
         raise RuntimeError("Model secret already recorded; inspect before changing")
 
-    model = input("DeepSeek model [deepseek-chat]: ").strip() or "deepseek-chat"
+    model = input("DeepSeek model [deepseek-v4-pro]: ").strip() or "deepseek-v4-pro"
     key = getpass("DeepSeek API key: ")
     if not key:
         raise ValueError("API key required")
