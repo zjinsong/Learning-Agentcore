@@ -99,4 +99,4 @@ AWS 凭证不能写进容器。程序通过执行角色获得必要的访问权�
 完整代码集中在各节末尾。示例资源名都有 `tutorial` 标记，真实标识保存在被 Git 忽略的 `.local/`，不依赖任何已有 CloudOps 环境。
 
 
-完成这一章后，你得到的是一条可验证的 Runtime → Gateway → Tool 基础链路。下一章不重新发明这条链路，而是在其上构建真正的 Agent：[第四章：构建一个完整 Agent](../04-agents/README.md)。
+完成这一章后，你得到的是一条可验证的 Runtime → Gateway → Tool 基础链路。下一章保留本章创建的 Gateway，并部署新的 Agent Runtime，加入模型和 Agent loop：[第四章：构建一个完整 Agent](../04-agents/README.md)。
