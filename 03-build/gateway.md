@@ -182,4 +182,4 @@ python examples/runtime/deploy.py invoke --prompt "check gateway"
 
 [Lambda 函数](../examples/gateway/handler.py)、[创建 Gateway 与 target](../examples/gateway/deploy.py)、[MCP 签名客户端](../examples/runtime/gateway_client.py)、[Runtime 更新与调用](../examples/runtime/deploy.py)。
 
-接下来可以 [清理学习资源](cleanup.md)，或继续 [第四章](../04-agents/README.md)。
+接下来继续 [第四章](../04-agents/README.md)。全部教程完成后，在 [第八章 Cleanup](../08-cleanup/README.md) 统一删除学习资源。
