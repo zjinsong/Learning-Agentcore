@@ -54,29 +54,29 @@ DeepSeek 提供 OpenAI-compatible API，因此可以直接作为模型提供给 
 
 参考：[AgentCore 使用任意模型](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/using-any-model.html)。
 
-## 三、费用要分开看
+## 三、费用
 
-下面是 2026 年 10 月 5 日核对的中国区公开标价。Runtime 页面当前列的是 **v2** 价格；实际使用的版本、区域与账单以服务和官方价格页为准。
+下面是 2026 年 10 月 5 日核对的 AWS 中国区公开标价：
 
 | 项目 | 公开标价 |
 | --- | --- |
-| Runtime v2 CPU | ¥0.866904192 / vCPU 小时 |
-| Runtime v2 内存 | ¥0.114817248 / GB 小时 |
+| Runtime CPU | ¥0.866904192 / vCPU 小时 |
+| Runtime 内存 | ¥0.114817248 / GB 小时 |
 | Browser / Code Interpreter CPU | ¥0.60805584 / vCPU 小时 |
 | Browser / Code Interpreter 内存 | ¥0.064202544 / GB 小时 |
 | Gateway 操作 | ¥0.0339696 / 千次 |
 | 单独使用 Identity 获取外部凭证 | ¥0.0679392 / 千次成功 token 或 API Key 请求 |
 | Observability | 按 CloudWatch 相关用量收费 |
 
-这些是计费单位，不是要求你提前购买一小时。Runtime 按实际资源消耗计费；等待模型时没有 CPU 消耗的部分不收 CPU 费，但内存等费用仍需考虑。
+Runtime 按实际资源使用量计费。
 
-通过 Runtime 或 Gateway 使用 Identity，不另收上述 Identity 凭证请求费。这里的 token 指身份访问令牌，不是模型生成的文字 token。[中国区价格及计费规则](https://www.amazonaws.cn/agentcore/pricing/)
+通过 Runtime 或 Gateway 使用 Identity，不另收上述 Identity 凭证请求费。[中国区价格及计费规则](https://www.amazonaws.cn/agentcore/pricing/)
 
-一项任务的总费用还可能包括模型调用、Lambda、ECR、日志和网络。不要把 Gateway 的千次价格当作整个助手的千次价格。
+实际费用还可能包括模型调用、Lambda、ECR、CloudWatch 和网络等相关服务。
 
-## 四、按这七章学习
+## 四、学习路径
 
-1. **[AWS 中国区功能介绍](01-china/README.md)**：组件怎么分工，Global 有哪些不同，缺失能力如何处理。
+1. **[AWS 中国区功能介绍](01-china/README.md)**：了解核心组件、中国区支持情况和对应实现方式。
 2. **[Vibe coding MCP 使用](02-mcp/README.md)**：给编码助手接入 AgentCore MCP，让它帮你查文档和写代码。
 3. **[服务构建指南](03-build/README.md)**：先把 Runtime、Gateway 和 MCP 工具链搭起来，理解 AgentCore 的基础设施。
 4. **[完整 Agent 实践](04-agents/README.md)**：在第三章基础上加入 DeepSeek 和 Agent loop，让 Agent 自主调用 Gateway tools。
@@ -84,6 +84,6 @@ DeepSeek 提供 OpenAI-compatible API，因此可以直接作为模型提供给 
 6. **[Code Interpreter + Browser - Codex 实践](06-codex-tools/README.md)**：让 Codex CLI 通过 MCP 使用持续 Code Interpreter 和 Browser 会话。
 7. **[Observability 实践](07-observability/README.md)**：用 AgentCore Observability 和 CloudWatch 查看指标、日志与 Trace。
 
-教程的运维例子借鉴 [AWS CloudOps 示例](https://github.com/aws-samples/sample-cloudops-multi-agent-system)，但不要求你部署完整 CloudOps 项目。这里使用独立的学习资源，不包含某个线上环境的 IP、账户信息或密码。
+教程使用独立的学习资源，通过一个简单的运维场景串联 Runtime、Gateway、Agent、Harness 和 Observability。
 
-每章都有解释、例子与操作方法。完整代码放在章节末尾，供你读懂之后使用。
+按章节顺序完成即可，代码与操作步骤保持对应。
