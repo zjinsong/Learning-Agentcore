@@ -65,7 +65,7 @@ claude mcp list
 
 这里使用 Claude Code CLI 的配置方法。`--scope user` 表示当前用户可以复用，`--` 后面是启动 MCP 的命令。在 Claude Code 会话中输入 `/mcp` 查看连接。[Claude Code 官方文档](https://code.claude.com/docs/en/mcp)
 
-项目级共享配置使用 `.mcp.json`。不要把 Kiro 的自动批准字段原样复制过来。
+项目级共享配置使用 `.mcp.json`；Kiro 的自动批准字段不适用于 Claude Code。
 
 ## 五、Codex：命令或配置二选一
 
