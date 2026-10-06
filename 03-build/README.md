@@ -70,7 +70,7 @@ aws sts get-caller-identity --region cn-northwest-1
 
 `china-learning` 是你的本地配置名，不是仓库提供的账号。尚未配置时，先完成企业已有的登录流程，或按 [CLI 凭证配置](https://docs.amazonaws.cn/en_us/cli/latest/userguide/cli-chap-configure.html) 建立自己的身份。上面的输出含账户信息，只在本地查看。
 
-若在 EC2 上使用实例角色，跳过 `export AWS_PROFILE=china-learning`，保持区域设置即可。不要把不存在的 profile 覆盖到已经可用的实例角色身份上。
+若在 EC2 上使用实例角色，跳过 `export AWS_PROFILE=china-learning`，仅保留区域设置，避免覆盖实例角色凭证链。
 
 北京区域使用 `cn-north-1`；整个实验保持一致。创建资源需要部署身份具备对应服务权限，运行程序则使用下面的执行角色。
 
