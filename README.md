@@ -78,13 +78,15 @@ response.raise_for_status()
 
 一项任务的总费用还可能包括模型调用、Lambda、ECR、日志和网络。不要把 Gateway 的千次价格当作整个助手的千次价格。
 
-## 四、按这五章学习
+## 四、按这七章学习
 
 1. **[AWS 中国区功能介绍](01-china/README.md)**：组件怎么分工，Global 有哪些不同，缺失能力如何处理。
 2. **[Vibe coding MCP 使用](02-mcp/README.md)**：给编码助手接入 AgentCore MCP，让它帮你查文档和写代码。
 3. **[服务构建指南](03-build/README.md)**：从本地程序到 Runtime，再连上 Gateway；一步一步解释 botocore 部署。
 4. **[Agent 应用例子](04-agents/README.md)**：构建监控、审计两个 Agent，再认识 Identity 的用途。
 5. **[Harness 实践](05-harness/README.md)**：把多个步骤组织成能够完成、失败时也能结束的任务。
+6. **[Code Interpreter + Browser - Codex 实践](06-codex-tools/README.md)**：让 Codex CLI 通过 MCP 使用持续 Code Interpreter 和 Browser 会话。
+7. **[Observability 实践](07-observability/README.md)**：用 CloudWatch 指标观察 Agent Runtime 和 Gateway。
 
 教程的运维例子借鉴 [AWS CloudOps 示例](https://github.com/aws-samples/sample-cloudops-multi-agent-system)，但不要求你部署完整 CloudOps 项目。这里使用独立的学习资源，不包含某个线上环境的 IP、账户信息或密码。
 
