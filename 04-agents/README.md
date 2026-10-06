@@ -1,6 +1,6 @@
 # 第四章：构建一个完整 Agent
 
-第三章已经验证了 Runtime → Gateway → Lambda 工具链。这一章不再重新做一套调用流程，而是在这个基础上加入模型和 Agent loop。
+第三章已经验证了 Runtime → Gateway → Lambda 工具链。这一章保留第三章创建的 Gateway，并部署新的 Agent Runtime，在此基础上加入模型和 Agent loop。
 
 示例仍然很小：监控 Agent 查询 EC2/CloudWatch，审计 Agent 查询 CloudTrail。两个 Agent 都运行在 AgentCore Runtime，模型使用 DeepSeek，工具来自第三章介绍的 AgentCore Gateway。
 
@@ -183,7 +183,7 @@ Identity 解决外部凭证管理，不负责模型选择，也不代替 Runtime
 
 ## 八、这一章学到了什么
 
-第三章让基础链路跑通；第四章把同一套 Runtime/Gateway 思路变成真正的 Agent 应用。
+第三章完成 Runtime、Gateway 和工具链验证；第四章复用 Gateway，部署新的 Agent Runtime，并加入模型和 Agent loop。
 
 关键边界是：模型负责理解和决策，Agent loop 负责模型与工具之间的循环，Gateway 提供受控工具，AWS 数据仍由工具用真实 API 查询。
 
