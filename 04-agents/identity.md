@@ -8,9 +8,9 @@ Key 由工单系统签发，不由 AgentCore 生成。Identity 保存这个**出
 
 ## 一、先确认真的需要它
 
-若目标只接受 IAM，就使用 IAM。若目标接受 OAuth，就按 OAuth 流程。这里为了讲清楚，选择 API Key。
+本节使用 API Key 演示 Identity 出站凭证管理。目标系统使用 IAM 或 OAuth 时，应按对应认证方式配置。
 
-你需要自己提供：可访问的 HTTPS API 地址、有效 Key、准确的接口描述。这不是 AWS 内置的免费工单服务。
+示例需要可访问的 HTTPS API、有效 API Key 和对应 OpenAPI 描述。
 
 ## 二、创建 API Key Provider
 
@@ -26,7 +26,7 @@ provider = control.create_api_key_credential_provider(
 provider_arn = provider["credentialProviderArn"]
 ```
 
-Provider 是“保存及引用这份凭证的配置”。返回的是引用标识，不能拿这个 ARN 代替真正的 Key 发给工单系统。
+Credential Provider 保存并引用凭证；返回的 ARN 是资源标识，不是外部 API Key。
 
 底层使用 botocore 创建 control 客户端，和第三章一样。创建过程需要 Identity、相关 Secrets Manager / KMS 配置权限；角色需要的具体权限按对应加密和凭证配置限定。[凭证 Provider 文档](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/resource-providers.html)
 
