@@ -83,6 +83,7 @@ Runtime 按实际资源使用量计费。
 5. **[Harness 实践](05-harness/README.md)**：把多个步骤组织成能够完成、失败时也能结束的任务。
 6. **[Code Interpreter + Browser - Codex 实践](06-codex-tools/README.md)**：让 Codex CLI 通过 MCP 使用持续 Code Interpreter 和 Browser 会话。
 7. **[Observability 实践](07-observability/README.md)**：用 AgentCore Observability 和 CloudWatch 查看指标、日志与 Trace。
+8. **[Cleanup](08-cleanup/README.md)**：完成教程后统一删除 Runtime、Gateway、Lambda、ECR、IAM、Secrets Manager 等学习资源。
 
 教程使用独立的学习资源，通过一个简单的运维场景串联 Runtime、Gateway、Agent、Harness 和 Observability。
 
