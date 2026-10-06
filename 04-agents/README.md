@@ -46,7 +46,7 @@ examples/agents/
 
 agent_app.py 是 Runtime 中真正运行的 Agent。gateway_tools.py 负责用 IAM/SigV4 连接 Gateway，并把 MCP tools 加载成 Strands 可以直接使用的工具。
 
-核心关系很简单：
+核心调用链：
 
 ~~~python
 model = OpenAIModel(
@@ -54,7 +54,7 @@ model = OpenAIModel(
         "api_key": config["key"],
         "base_url": "https://api.deepseek.com",
     },
-    model_id=config.get("model", "deepseek-chat"),
+    model_id=config.get("model", "deepseek-v4-pro"),
 )
 
 with gateway_tools(gateway_url, region, kind) as tools:
@@ -66,7 +66,7 @@ with gateway_tools(gateway_url, region, kind) as tools:
     answer = agent(question)
 ~~~
 
-这里的 OpenAIModel 表示使用 OpenAI-compatible API，并不表示调用 OpenAI。DeepSeek 提供兼容接口，所以只需要配置 base_url、API Key 和模型名。
+`OpenAIModel` 用于 OpenAI-compatible API。DeepSeek 通过 `base_url`、API Key 和 `model_id` 配置。
 
 模型配置方法参考：[Using any foundation model](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/using-any-model.html)。
 
@@ -127,7 +127,7 @@ python examples/agents/build.py runtimes
 python examples/agents/configure_model.py
 ~~~
 
-脚本会安全读取 DeepSeek API Key，默认模型是 deepseek-chat，把配置保存到本实验专用 Secrets Manager Secret，并只给两个 Runtime role 读取该 Secret 的权限。
+脚本会安全读取 DeepSeek API Key，默认模型是 deepseek-v4-pro，把配置保存到本实验专用 Secrets Manager Secret，并只给两个 Runtime role 读取该 Secret 的权限。
 
 Runtime 中最终得到的模型配置类似：
 
@@ -137,7 +137,7 @@ OpenAIModel(
         "api_key": key,
         "base_url": "https://api.deepseek.com",
     },
-    model_id="deepseek-chat",
+    model_id="deepseek-v4-pro",
 )
 ~~~
 
