@@ -86,55 +86,27 @@ MCP 是工具交互协议。你先列举工具，看到名字、用途和参数�
 
 ## 六、Global 与中国区的差异
 
-北京是 `cn-north-1`，宁夏是 `cn-northwest-1`。中国区不是只修改 Global 示例里的 region，ARN 分区和某些服务配置也不同。
+AWS 中国区已经提供 Runtime、Gateway、Identity、Observability、Browser 和 Code Interpreter，可以完成本教程中的 Agent 运行、工具调用、身份管理、代码执行、浏览器操作和监控链路。
 
-| 能力 | 中国区情况 | 实际影响 |
+与 Global 相比，部分 AgentCore 能力和配置选项尚未提供。开发时按下面方式处理即可：
+
+| Global 能力或配置 | 中国区 | 本教程的处理方式 |
 | --- | --- | --- |
-| Runtime / Gateway / Identity / Observability / Browser / Code Interpreter | 可用 | 可构建基本 Agent 应用链路 |
-| Memory | 未提供 | 自己保存会话和摘要 |
-| Harness | 未提供 | 自己实现执行控制逻辑 |
-| Registry | 未提供 | 自己维护能力清单 |
-| Policy | 未提供 | 组合 IAM 与应用、工具限制 |
-| Knowledge Bases | 未提供 | 选择可用的检索系统 |
-| Evaluations / Optimizations | 未提供 | 自建测试问题和评测记录 |
-| Payments | 未提供 | 本教程不依赖 |
+| Memory | 未提供 | 按应用需要使用 DynamoDB、S3、Redis/Valkey 或数据库管理会话与长期记忆 |
+| Harness | 未提供托管能力 | 在应用中实现任务编排、超时、失败处理和状态管理，第五章给出示例 |
+| Registry | 未提供 | 使用应用配置或数据库维护 Agent/工具能力清单 |
+| Policy | 未提供 | 使用 IAM、Gateway 鉴权、工具权限和应用校验控制访问 |
+| Knowledge Bases | 未提供 | 接入中国区可用的检索或向量存储方案 |
+| Evaluations / Optimizations | 未提供 | 使用自己的测试集、质量指标和评测流程 |
+| Runtime Managed EC2 | 未提供 | 使用 AgentCore Runtime 的 MicroVM 运行方式 |
+| S3 Files 挂载 | 未提供 | 应用通过 S3 API 读写对象，需要处理时使用本地临时目录 |
+| Cognito 快捷入站配置 | 未提供 | 使用 IAM，或企业 OIDC IdP + CUSTOM_JWT |
+| Gateway 语义工具搜索 | 未提供 | 使用 tools/list，必要时在应用中维护工具路由 |
+| Gateway inference target | 未提供 | Agent 应用直接配置并调用模型，例如本教程的 DeepSeek |
+| Gateway 无鉴权入站 | 未提供 | 使用 AWS_IAM 或 CUSTOM_JWT |
 
-以上“未提供”指 AgentCore 平台的对应能力，不是 AWS 其他产品的所有同名功能。
+这些差异主要影响组件选择和实现方式，不改变 Agent 的核心工作模式：**模型负责理解与决策，Runtime 托管 Agent，Gateway 提供工具，Identity 管理身份和外部凭证，Observability 负责运行观测。** 对本教程覆盖的 Agent 功能和使用价值没有本质影响。
 
-可用组件内部也有差异。读到 Global 示例时，对照这张表：
-
-| Global 示例中的选项 | 中国区情况 | 如何处理 |
-| --- | --- | --- |
-| Runtime Managed EC2 | 不可用 | 使用 MicroVM；不要把托管 EC2 与自己运行 Agent 的 EC2 混淆 |
-| Runtime / Tools 的 S3 Files 挂载 | 不可用 | 应用按需通过 S3 API 读写，再处理本地临时文件 |
-| Cognito 入站登录快速配置 | 不支持 | 用 IAM，或可信企业 OIDC IdP 与 CUSTOM_JWT |
-| Identity Private IdP | 不支持 | 核对 IdP 网络与受支持配置；不能仅改名称假装是支持的 Provider |
-| GitHub、Google、Facebook、X、Reddit、Twitch、Dropbox、CyberArk 内置 OAuth Provider | 不提供 | 目标兼容时评估 Custom OAuth 配置；网络可达与目标授权仍要验证 |
-| Browser / Tools Web Bot Auth Signer | 不提供 | 优先用目标 API，或目标允许的正常网页认证流程 |
-| Gateway 语义工具搜索 | 不提供 | tools/list，加应用维护的能力清单与路由 |
-| Gateway 无鉴权入站 | 不提供 | 所有 Gateway 选 IAM 或 CUSTOM_JWT |
-| Gateway inference target | 不提供 | Agent 代码直接调用可访问的模型接口 |
-| 控制台 connector catalog | 不提供 | 按真实 API 手动定义 OpenAPI / MCP / Lambda target |
-| Gateway WAF 集成 | 不提供 | 在自建应用入口设置防护；Gateway 本身仍强制鉴权，防止绕过入口 |
-| Gateway rules、ConfigBundle A/B | 不提供 | 应用做校验、路由与分流，分别验证两个版本 |
-
-文档首页部分 Console / GitHub / boto3 快捷入口也缺失，可以直接访问对应文档与 API 参考。功能会变化，完整清单以 [官方中国区差异页](https://docs.amazonaws.cn/en_us/aws/latest/userguide/bedrock-agentcore.html) 为准。
-
-## 七、缺失能力如何替代
-
-替代不是立刻造一个“完整平台”。先解决应用当前需要的问题。
-
-如果你只想记住几轮对话，可以先保存会话记录；需要跨任务恢复时，再设计数据库。如果只有两个 Agent，一个 JSON 配置文件就能记录能力，无需先搭大型注册系统。
-
-| 需求 | 可以从什么开始 | 成长后的选择 |
-| --- | --- | --- |
-| 保存历史 | 本地学习文件 | 按用户隔离的 DynamoDB / S3，设计保留期限 |
-| 发现专家 | 配置中的名字、能力和 Runtime ARN | 数据库、版本、健康检查 |
-| 控制权限 | 最小 IAM 权限、工具参数校验 | 多租户授权、细粒度策略与审计 |
-| 执行多步任务 | Python 工作流 | 任务数据库、队列、恢复与总期限 |
-| 文档检索 | 文档 MCP 或已有检索 API | 按权限建设应用 RAG |
-| 评测 | 固定问题与预期行为 | 持续评测、质量和成本统计 |
-
-这也是第五章 Harness 的出发点：先让一个任务可靠完成，再逐步完善。
+功能会持续更新，完整支持范围以 [AWS 中国区 AgentCore 功能差异](https://docs.amazonaws.cn/en_us/aws/latest/userguide/bedrock-agentcore.html) 为准。
 
 下一章：[Vibe coding MCP 使用](../02-mcp/README.md)。
