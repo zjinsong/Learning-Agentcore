@@ -140,7 +140,7 @@ python -m pip install -U botocore
 python invoke_first.py
 ```
 
-`unset AWS_PROFILE` 很重要：不要让前面为本机准备的 profile 覆盖 EC2 的实例角色。botocore 会通过默认凭证链获取实例角色的临时凭证。不要把本机的长期 Access Key 写进代码。部署记录含资源标识，留在自己的环境，不提交到公开仓库。
+在 EC2 上执行前运行 `unset AWS_PROFILE`，让 botocore 通过默认凭证链使用实例角色临时凭证。不要在代码中保存长期 Access Key；部署记录保留在本地，不提交到公开仓库。
 
 ### 4. 调用权限与常见错误
 
@@ -212,7 +212,7 @@ https://bedrock-agentcore.<区域>.amazonaws.com.cn/runtimes/<URL编码后的Run
 
 本页的 `.read()` 用于读取整个简单响应。若应用返回 SSE，应按事件解析；想边接收边显示，可读取响应流的 chunk，但网络 chunk 不一定等于完整事件，不可直接逐 chunk 当 JSON。
 
-界面需要标准的开始、工具调用、文本片段和结束事件时，再考虑 AG-UI。入门先把一个 HTTP 请求/回答跑通。
+需要标准化开始、工具调用、文本片段和结束事件时，可再引入 AG-UI。
 
 ## 八、练习：同一个应用，两个 session
 
@@ -293,7 +293,7 @@ python examples/runtime/deploy.py invoke --prompt hello
 
 **本教程的脚本**每次省略 `--session-id` 时都会生成一个新 UUID；想复用，就像上面一样显式传入。这个行为来自脚本，不是说所有 SDK 调用都必须如此。
 
-实际聊天应用应为各用户的会话保存对应 ID，并独立设计聊天历史存储。不要给所有用户使用同一个固定 ID，也不要把会话复用当成永久记忆。
+实际聊天应用应按用户维护 session ID，并独立设计聊天历史存储；session 复用不等同于长期记忆。
 
 ## 代码与下一步
 
