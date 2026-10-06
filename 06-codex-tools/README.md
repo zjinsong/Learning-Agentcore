@@ -59,7 +59,7 @@ aws.browser.v1
 python 06-codex-tools/example/mcp_server.py
 ~~~
 
-这是 stdio MCP server，启动后等待 MCP 客户端连接，因此终端没有普通 Web 服务的监听提示是正常的。
+该进程是 stdio MCP server，启动后等待 MCP 客户端连接。
 
 代码第一次收到 sandbox 工具调用时才创建 Code Interpreter session；第一次收到 browser 工具调用时才创建 Browser session。后续调用复用同一个 session。
 
@@ -147,9 +147,7 @@ Browser 不是运行在本机 Chrome 中。Playwright 只是通过 CDP 控制 Ag
 
 ## 七、为什么保持持续 session
 
-如果每个 MCP tool call 都重新创建 session，前后步骤无法共享状态，而且会增加启动开销。
-
-所以示例采用：
+示例复用 Code Interpreter 和 Browser session，以保留上下文并减少重复启动：
 
 ~~~text
 Codex process
@@ -157,7 +155,7 @@ Codex process
   └─ one Browser session
 ~~~
 
-session 的最长时间仍受 AgentCore 服务限制。这个示例适合学习和单用户实践；生产环境还需要考虑用户隔离、并发、超时、持久文件和权限边界。
+生产环境还需设计用户隔离、并发、超时、文件持久化和权限边界。
 
 ## 八、验证
 
