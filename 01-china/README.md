@@ -1,8 +1,6 @@
 # 第一章：AWS 中国区功能介绍
 
-很多教程先画一张很大的架构图，读者还没开始，就遇到十几个名词。
-
-我们换一种方式。只问一个问题：**一个助手怎样替你查服务器？**
+本章通过一个简单问题介绍 AgentCore 的核心组件：**一个 Agent 怎样查询服务器状态？**
 
 ## 一、先把请求走一遍
 
@@ -44,7 +42,7 @@ MCP 是工具交互协议。你先列举工具，看到名字、用途和参数�
 
 ## 四、Identity：先分清入站和出站
 
-“Identity”最容易被混成一件事。实际上先问方向就清楚了：是用户进入 Agent，还是 Agent 去访问别的系统？
+Identity 可以从两个方向理解：入站认证和出站授权。
 
 ![AgentCore Identity：入站认证与出站授权](../assets/identity-inbound-outbound.svg)
 
@@ -76,7 +74,7 @@ MCP 是工具交互协议。你先列举工具，看到名字、用途和参数�
 
 **Identity 的 API Key Provider 不是入站 API Key。** 它不让客户拿 Key 直接调用 Runtime 或 Gateway；它是 Agent 出站调用外部服务时使用的 Key 存放与引用配置。完整 API Key 例子在第四章的 [外部工单服务](../04-agents/identity.md)。[Identity 概览](https://docs.amazonaws.cn/en_us/bedrock-agentcore/latest/devguide/identity.html)
 
-## 五、另外三个组件
+## 五、其他组件
 
 **Observability** 帮你看执行过程。你需要知道请求耗时、工具返回了什么错误、模型调用在哪一步。它与 CloudWatch 等观测能力配合，应用仍须按需要记录和配置追踪。
 
