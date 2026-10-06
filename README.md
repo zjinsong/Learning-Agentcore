@@ -1,14 +1,6 @@
 # 从零认识 AgentCore
 
-假设你想做一个运维助手。
-
-你问：“今天服务器运行得怎么样？”它查询监控，查看审计记录，然后给出一段解释。
-
-把这样的程序用于实际环境，还需要解决运行环境、工具连接、访问控制、凭证管理和运行监控。
-
-**AgentCore 提供的，就是这些基础设施。** 你写助手的逻辑，它提供运行环境和连接能力。
-
-这份教程面向第一次接触 AgentCore 的读者。默认使用 AWS 中国（宁夏）区域；北京区域的选择方法也会说明。你只需懂一点 Python，按顺序读下去。
+本教程以一个简单的运维 Agent 为例，介绍 AgentCore Runtime、Gateway、Identity、Harness、Code Interpreter、Browser 和 Observability 的基本用法。默认使用 AWS 中国（宁夏）区域，也适用于北京区域。
 
 ## 一、核心组件
 
@@ -44,13 +36,13 @@ model = OpenAIModel(
         "api_key": deepseek_api_key,
         "base_url": "https://api.deepseek.com",
     },
-    model_id="deepseek-chat",
+    model_id="deepseek-v4-pro",
 )
 
 agent = Agent(model=model)
 ~~~
 
-DeepSeek 提供 OpenAI-compatible API，因此可以直接作为模型提供给 Agent。实际项目中 API Key 应放在 Secrets Manager 或其他安全配置中，不要写进代码。
+DeepSeek 提供 OpenAI-compatible API。API Key 应存放在 Secrets Manager 或其他安全配置中。
 
 参考：[AgentCore 使用任意模型](https://docs.amazonaws.cn/bedrock-agentcore/latest/devguide/using-any-model.html)。
 
@@ -77,14 +69,11 @@ Runtime 按实际资源使用量计费。
 ## 四、学习路径
 
 1. **[AWS 中国区功能介绍](01-china/README.md)**：了解核心组件、中国区支持情况和对应实现方式。
-2. **[Vibe coding MCP 使用](02-mcp/README.md)**：给编码助手接入 AgentCore MCP，让它帮你查文档和写代码。
-3. **[服务构建指南](03-build/README.md)**：先把 Runtime、Gateway 和 MCP 工具链搭起来，理解 AgentCore 的基础设施。
-4. **[完整 Agent 实践](04-agents/README.md)**：在第三章基础上加入 DeepSeek 和 Agent loop，让 Agent 自主调用 Gateway tools。
-5. **[Harness 实践](05-harness/README.md)**：把多个步骤组织成能够完成、失败时也能结束的任务。
+2. **[Vibe coding MCP 使用](02-mcp/README.md)**：为编码工具接入 AgentCore MCP，查询文档并辅助开发。
+3. **[服务构建指南](03-build/README.md)**：部署 Runtime、Gateway 和 MCP 工具链。
+4. **[完整 Agent 实践](04-agents/README.md)**：使用 Strands + DeepSeek 构建可调用 Gateway tools 的 Agent。
+5. **[Harness 实践](05-harness/README.md)**：实现多 Agent 任务编排、超时和失败处理。
 6. **[Code Interpreter + Browser - Codex 实践](06-codex-tools/README.md)**：让 Codex CLI 通过 MCP 使用持续 Code Interpreter 和 Browser 会话。
 7. **[Observability 实践](07-observability/README.md)**：用 AgentCore Observability 和 CloudWatch 查看指标、日志与 Trace。
-8. **[Cleanup](08-cleanup/README.md)**：完成教程后统一删除 Runtime、Gateway、Lambda、ECR、IAM、Secrets Manager 等学习资源。
+8. **[Cleanup](08-cleanup/README.md)**：删除教程创建的 Runtime、Gateway、Lambda、ECR、IAM 和 Secrets Manager 资源。
 
-教程使用独立的学习资源，通过一个简单的运维场景串联 Runtime、Gateway、Agent、Harness 和 Observability。
-
-按章节顺序完成即可，代码与操作步骤保持对应。
