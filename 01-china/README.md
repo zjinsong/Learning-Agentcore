@@ -91,7 +91,6 @@ AWS 中国区已经提供 Runtime、Gateway、Identity、Observability、Browser
 | Cognito 快捷入站配置 | 未提供 | 使用 IAM，或企业 OIDC IdP + CUSTOM_JWT |
 | Gateway 语义工具搜索 | 未提供 | 使用 tools/list，必要时在应用中维护工具路由 |
 | Gateway inference target | 未提供 | Agent 应用直接配置并调用模型，例如本教程的 DeepSeek |
-| Gateway 无鉴权入站 | 未提供 | 使用 AWS_IAM 或 CUSTOM_JWT |
 
 这些差异主要影响组件选择和实现方式，不改变 Agent 的核心工作模式：**模型负责理解与决策，Runtime 托管 Agent，Gateway 提供工具，Identity 管理身份和外部凭证，Observability 负责运行观测。** 对用户构建 AI Agent 不产生本质影响。
 
